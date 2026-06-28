@@ -28,8 +28,9 @@ int main() {
 	__nv_bfloat16 *c_cpu  = (__nv_bfloat16*)malloc(sC);
 	__nv_bfloat16 *c_gpu  = (__nv_bfloat16*)malloc(sC);
 
-	memset(a_host, 0x3f, sA);
-	memset(b_host, 0x3f, sB);
+	// 随机输入：常数输入下 layout 排列错误也会得到相同结果，测不出 PTX fragment 映射的 bug。
+	fill_matrix(a_host, M * K, -1.0f, 1.0f);
+	fill_matrix(b_host, K * N, -1.0f, 1.0f);
 
 	cpu_gemm(a_host, b_host, c_cpu, M, N, K);
 
@@ -81,11 +82,13 @@ int main() {
 	
 	printf("%f", ms2/ms);
 
-	CUDA_CHECK(cudaMemcpy(c_gpu, c_device, sC, cudaMemcpyDeviceToHost));
-	//if (matricesEqual(c_gpu, c_cpu, M * N, 1e-1f))
-	//	printf("cuBLAS: SUCCESS\n");
-	//else
-	//	printf("cuBLAS: WRONG\n");
+	// c_gpu 仍保存着我们 kernel 的结果（第 54 行拷入，之后没被覆盖）；
+	// 把 cuBLAS 的结果拷进 c_cpu 作为参照，逐元素对比。
+	CUDA_CHECK(cudaMemcpy(c_cpu, c_device, sC, cudaMemcpyDeviceToHost));
+	if (matricesEqual(c_gpu, c_cpu, M * N, 2e-2f))
+		printf("accuracy vs cuBLAS: SUCCESS\n");
+	else
+		printf("accuracy vs cuBLAS: WRONG\n");
 
 	cublasDestroy(handle);
 

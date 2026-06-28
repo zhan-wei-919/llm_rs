@@ -1,8 +1,10 @@
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
 #include <mma.h>
+#include <type_traits>
 #include "Config.h"
 #include "GemmLoader.cuh"
+#include "MmaPtx.cuh"
 
 template<typename Config>
 __global__ void Gemm (
@@ -137,6 +139,117 @@ __global__ void Gemm (
 		}	
 }
 
+// 16 位（bf16/f16）专用快路：ldmatrix + mma.sync，累加器留在寄存器，epilogue 直写 global。
+// 仅 sm_80+。tile 加载（cp.async）和 double buffer 与 wmma 版完全一致，只换了 fragment load + mma + 写回。
+template<typename Config>
+__global__ void GemmMma (
+		const typename Config::In	*__restrict__ A,
+		const typename Config::In	*__restrict__ B,
+		typename Config::Out		*__restrict__ C,
+		const typename Config::Out	*__restrict__ bias,
+		const float	alpha, const float beta,
+		int M, int N, int K
+) {
+#if __CUDA_ARCH__ >= 800
+		using In = typename Config::In;
+		constexpr bool IsBF16 = std::is_same<In, __nv_bfloat16>::value;
+		constexpr int BM = Config::BM, BN = Config::BN, BK = Config::BK;
+		constexpr int WM = Config::WM, WN = Config::WN, PAD = Config::PAD;
+		constexpr int MI = WM / 16;   // 每个 warp M 方向的 mma tile 数（每个 16 行）
+		constexpr int NI = WN / 8;    // 每个 warp N 方向的 mma tile 数（每个 8 列）
+		constexpr int NB = WN / 16;   // ldmatrix.x4.trans 每次取 16 列 = 2 个 n-tile
+
+		int tid = threadIdx.x;
+		int warp_id = tid / 32, lane = tid % 32;
+		int warp_row = warp_id / Config::WARPS_N, warp_col = warp_id % Config::WARPS_N;
+		int wm0 = warp_row * WM, wn0 = warp_col * WN;
+		int block_row = blockIdx.y * BM, block_col = blockIdx.x * BN;
+
+		extern __shared__ char smem_buf[];
+		auto &sa = *reinterpret_cast<In(*)[2][BM][BK + PAD]>(smem_buf);
+		auto &sb = *reinterpret_cast<In(*)[2][BK][BN + PAD]>(
+				smem_buf + sizeof(In) * 2 * BM * (BK + PAD));
+
+		float acc[MI][NI][4];
+		#pragma unroll
+		for (int mi = 0; mi < MI; ++mi)
+				#pragma unroll
+				for (int ni = 0; ni < NI; ++ni)
+						#pragma unroll
+						for (int t = 0; t < 4; ++t) acc[mi][ni][t] = 0.0f;
+
+		TileLoader<Config> loader { A, B, tid, block_row, block_col, M, N, K };
+		loader.gmem_to_smem(0, 0, sa, sb);
+		__pipeline_wait_prior(0);
+		__syncthreads();
+
+		// ldmatrix 取址：lane 的低 4 位选 16 行里的哪一行，高位选 K（或 N）的低半/高半。
+		int row16 = lane % 16, colh = (lane / 16) * 8;
+		int cur = 0;
+
+		for (int i = 0; i < K; i += BK) {
+				int next_i = i + BK;
+				if (next_i < K) loader.gmem_to_smem(next_i, cur ^ 1, sa, sb);
+
+				#pragma unroll
+				for (int kk = 0; kk < BK; kk += 16) {
+						uint32_t a[MI][4];
+						#pragma unroll
+						for (int mi = 0; mi < MI; ++mi)
+								ldmatrix_x4(a[mi], smem_addr(&sa[cur][wm0 + mi * 16 + row16][kk + colh]));
+
+						uint32_t b[NI][2];
+						#pragma unroll
+						for (int nb = 0; nb < NB; ++nb) {
+								uint32_t r[4];
+								ldmatrix_x4_trans(r, smem_addr(&sb[cur][kk + row16][wn0 + nb * 16 + colh]));
+								b[nb * 2 + 0][0] = r[0]; b[nb * 2 + 0][1] = r[1];
+								b[nb * 2 + 1][0] = r[2]; b[nb * 2 + 1][1] = r[3];
+						}
+
+						#pragma unroll
+						for (int mi = 0; mi < MI; ++mi)
+								#pragma unroll
+								for (int ni = 0; ni < NI; ++ni)
+										mma_m16n8k16<IsBF16>(acc[mi][ni], a[mi], b[ni]);
+				}
+
+				if (next_i < K) {
+						__pipeline_wait_prior(0);
+						__syncthreads();
+						cur ^= 1;
+				}
+		}
+
+		// epilogue：m16n8 的 C fragment 布局——groupID 选行，threadID_in_group 选列对。
+		int groupID = lane / 4, tig = lane % 4;
+		#pragma unroll
+		for (int mi = 0; mi < MI; ++mi) {
+				#pragma unroll
+				for (int ni = 0; ni < NI; ++ni) {
+						int base_row = block_row + wm0 + mi * 16;
+						int base_col = block_col + wn0 + ni * 8;
+						int rr[4] = { groupID, groupID, groupID + 8, groupID + 8 };
+						int cc[4] = { tig * 2, tig * 2 + 1, tig * 2, tig * 2 + 1 };
+						#pragma unroll
+						for (int t = 0; t < 4; ++t) {
+								int gr = base_row + rr[t], gc = base_col + cc[t];
+								if (gr < M && gc < N) {
+										int idx = gr * N + gc;
+										float v = alpha * acc[mi][ni][t];
+										if (beta != 0) v += beta * static_cast<float>(C[idx]);
+										if (bias)     v += static_cast<float>(bias[gc]);
+										C[idx] = static_cast<typename Config::Out>(v);
+								}
+						}
+				}
+		}
+#else
+		// mma.m16n8k16 需要 sm_80+；本 kernel 只在 16 位类型 + sm_80+ 上被分发。
+		__trap();
+#endif
+}
+
 template<typename Config>
 void launch_Gemm_forward(
 		const typename Config::In *A, 
@@ -145,14 +258,24 @@ void launch_Gemm_forward(
 		const typename Config::Out *bias,
 		float alpha, float beta, int M, int N, int K, cudaStream_t s
 ) {
-		cudaFuncSetAttribute(
-				Gemm<Config>,
-				cudaFuncAttributeMaxDynamicSharedMemorySize,
-				Config::SMEM_BYTES
-		);
 		dim3 block(Config::THREADS);
 		dim3 grid((N + Config::BN - 1) / Config::BN, (M + Config::BM - 1) / Config::BM);
-		Gemm<Config><<<grid, block, Config::SMEM_BYTES, s>>>(A, B, C, bias, alpha, beta, M, N, K);
+		// 16 位类型走 ldmatrix + mma.sync 快路，其余（int8）走 wmma 版。
+		if constexpr (sizeof(typename Config::In) == 2) {
+				cudaFuncSetAttribute(
+						GemmMma<Config>,
+						cudaFuncAttributeMaxDynamicSharedMemorySize,
+						Config::SMEM_BYTES
+				);
+				GemmMma<Config><<<grid, block, Config::SMEM_BYTES, s>>>(A, B, C, bias, alpha, beta, M, N, K);
+		} else {
+				cudaFuncSetAttribute(
+						Gemm<Config>,
+						cudaFuncAttributeMaxDynamicSharedMemorySize,
+						Config::SMEM_BYTES
+				);
+				Gemm<Config><<<grid, block, Config::SMEM_BYTES, s>>>(A, B, C, bias, alpha, beta, M, N, K);
+		}
 }
 
 #define GEMM_FORWARD(name, InT, OutT)                                         \
