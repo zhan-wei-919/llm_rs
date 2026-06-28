@@ -139,8 +139,6 @@ __global__ void Gemm (
 		}	
 }
 
-// 16 位（bf16/f16）专用快路：ldmatrix + mma.sync，累加器留在寄存器，epilogue 直写 global。
-// 仅 sm_80+。tile 加载（cp.async）和 double buffer 与 wmma 版完全一致，只换了 fragment load + mma + 写回。
 template<typename Config>
 __global__ void GemmMma (
 		const typename Config::In	*__restrict__ A,
@@ -183,7 +181,6 @@ __global__ void GemmMma (
 		__pipeline_wait_prior(0);
 		__syncthreads();
 
-		// ldmatrix 取址：lane 的低 4 位选 16 行里的哪一行，高位选 K（或 N）的低半/高半。
 		int row16 = lane % 16, colh = (lane / 16) * 8;
 		int cur = 0;
 
@@ -221,7 +218,6 @@ __global__ void GemmMma (
 				}
 		}
 
-		// epilogue：m16n8 的 C fragment 布局——groupID 选行，threadID_in_group 选列对。
 		int groupID = lane / 4, tig = lane % 4;
 		#pragma unroll
 		for (int mi = 0; mi < MI; ++mi) {
@@ -245,7 +241,6 @@ __global__ void GemmMma (
 				}
 		}
 #else
-		// mma.m16n8k16 需要 sm_80+；本 kernel 只在 16 位类型 + sm_80+ 上被分发。
 		__trap();
 #endif
 }
@@ -260,7 +255,6 @@ void launch_Gemm_forward(
 ) {
 		dim3 block(Config::THREADS);
 		dim3 grid((N + Config::BN - 1) / Config::BN, (M + Config::BM - 1) / Config::BM);
-		// 16 位类型走 ldmatrix + mma.sync 快路，其余（int8）走 wmma 版。
 		if constexpr (sizeof(typename Config::In) == 2) {
 				cudaFuncSetAttribute(
 						GemmMma<Config>,
