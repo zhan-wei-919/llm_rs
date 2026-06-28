@@ -35,3 +35,14 @@ void launch_GELU_forward(T *y, const T *x, int N, cudaStream_t s = nullptr) {
 		int blocks = (N + VEC * threads - 1) / (VEC * threads);
 		GELU<<<blocks, threads, 0, s>>>(y, x, N);
 }
+
+#define GELU_FORWARD(name, T) \
+extern "C" void gelu_forward_##name(T *y, const T *x, int N, cudaStream_t s) { \
+		launch_GELU_forward(y, x, N, s); \
+}
+
+GELU_FORWARD(bf16, __nv_bfloat16)
+GELU_FORWARD(f16, half)
+GELU_FORWARD(f32, float)
+
+#undef  GELU_FORWARD
