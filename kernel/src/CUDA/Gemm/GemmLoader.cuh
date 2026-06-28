@@ -1,5 +1,6 @@
 #pragma once
 #include "Config.h"
+#include <cuda_pipeline.h>
 
 template<typename Config>
 struct TileLoader {
@@ -66,5 +67,45 @@ struct TileLoader {
 								*reinterpret_cast<float4*>(&shared_b[stage][row][col]) = rb[p];
 						}
 				}
+		}
+		
+		__device__ inline void gmem_to_smem(int k0, int stage, T (&shared_a)[2][BM][BK + PAD], T (&shared_b)[2][BK][BN + PAD]) {
+				#pragma unroll
+				for (int p = 0; p < A_LPT; ++p) {
+						int f4_idx = tid + p * THREADS;
+						if (f4_idx < A_F4) {
+								int e_idx = f4_idx * VEC;
+								int row = e_idx / BK, col = e_idx % BK;
+								int idx = (block_row + row) * K + k0 + col;
+								bool op_in = (block_row + row < M) && (k0 + col + VEC <= K);
+								if (op_in) {
+										__pipeline_memcpy_async(
+												&shared_a[stage][row][col],
+												&A[idx],
+												sizeof(float4));
+								} else {
+										*reinterpret_cast<float4*>(&shared_a[stage][row][col]) = float4{0,0,0,0};
+								}
+						}
+				}
+				#pragma unroll
+				for (int p = 0; p < B_LPT; ++p) {
+						int f4_idx = tid + p * THREADS;
+						if (f4_idx < B_F4) {
+								int e_idx = f4_idx * VEC;
+								int row = e_idx / BN, col = e_idx % BN;
+								int idx = (k0 + row) * N + block_col + col;
+								bool op_in = (k0 + row < K) && (block_col + col + VEC <= N);
+								if (op_in) {
+										__pipeline_memcpy_async(
+												&shared_b[stage][row][col],
+												&B[idx],
+												sizeof(float4));
+								} else {
+										*reinterpret_cast<float4*>(&shared_b[stage][row][col]) = float4{0,0,0,0};
+								}
+						}
+				}
+				__pipeline_commit();
 		}
 };

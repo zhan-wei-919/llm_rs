@@ -12,7 +12,7 @@ template<typename InElem, typename OutElem>
 struct GemmConfig {
 		static constexpr int BM	= 128;
 		static constexpr int BN	= 128;
-		static constexpr int BK	= 16;
+		static constexpr int BK	= 32;
 		static constexpr int WM	= 64;
 		static constexpr int WN	= 64;
 		static constexpr int WARPS_M = BM / WM, WARPS_N = BN / WN;
@@ -29,4 +29,6 @@ struct GemmConfig {
 		static constexpr int A_F4 = BM * BK / VEC, A_LPT = (A_F4 + THREADS - 1) / THREADS;
 		static constexpr int B_F4 = BK * BN / VEC, B_LPT = (B_F4 + THREADS - 1) / THREADS;
 		static constexpr int PAD = 8;
+		
+		static constexpr int SMEM_BYTES = sizeof(InElem) * 2 * BM * (BK + PAD) + sizeof(InElem) * 2 * BK * (BN + PAD);
 };

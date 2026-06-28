@@ -19,7 +19,10 @@ __global__ void Gemm (
 		int warp_id = threadIdx.x / 32, warp_row = warp_id / Config::WARPS_N, warp_col = warp_id % Config::WARPS_N;
 		int wm0 = warp_row * Config::WM, wn0 = warp_col * Config::WN;
 		
-		__shared__ typename Config::In shared_a[2][Config::BM][Config::BK + Config::PAD], shared_b[2][Config::BK][Config::BN + Config::PAD];
+		extern __shared__ char smem_buf[];
+		auto &shared_a = *reinterpret_cast<typename Config::In(*)[2][Config::BM][Config::BK + Config::PAD]>(smem_buf);
+		auto &shared_b = *reinterpret_cast<typename Config::In(*)[2][Config::BK][Config::BN + Config::PAD]>(
+				smem_buf + sizeof(typename Config::In) * 2 * Config::BM * (Config::BK + Config::PAD));
 		
 		wmma::fragment<wmma::accumulator, Config::WMMA_M, Config::WMMA_N, Config::WMMA_K, typename Config::Acc> c_frag[Config::FM][Config::FN];
 		for (int m = 0; m < Config::FM; ++m) {
@@ -34,19 +37,20 @@ __global__ void Gemm (
 				M, N, K
 		};
 		
-		int cur = 0; float4 ra[Config::A_LPT], rb[Config::B_LPT];
-		loader.gmem_to_reg(0, ra, rb);
-		loader.reg_to_smem(0, ra, rb, shared_a, shared_b);
+		int cur = 0;
+
+#if __CUDA_ARCH__ >= 800
+		loader.gmem_to_smem(0, 0, shared_a, shared_b);
+		__pipeline_wait_prior(0);
 		__syncthreads();
-		
+
 		for (int i = 0; i < K; i += Config::BK) {
 				int next_i = i + Config::BK;
-				float4 next_a[Config::A_LPT], next_b[Config::B_LPT];
-				if (next_i < K) loader.gmem_to_reg(next_i, next_a, next_b);
-				
+				if (next_i < K) loader.gmem_to_smem(next_i, cur ^ 1, shared_a, shared_b);
+
 				wmma::fragment<wmma::matrix_a, Config::WMMA_M, Config::WMMA_N, Config::WMMA_K, typename Config::In, wmma::row_major> a_frag[Config::FM];
 				wmma::fragment<wmma::matrix_b, Config::WMMA_M, Config::WMMA_N, Config::WMMA_K, typename Config::In, wmma::row_major> b_frag[Config::FN];
-				
+
 				for (int k = 0; k < Config::BK; k += Config::WMMA_K) {
 						for (int m = 0; m < Config::FM; ++m) {
 								wmma::load_matrix_sync(a_frag[m], &shared_a[cur][wm0 + m * Config::WMMA_M][k], Config::BK + Config::PAD);
@@ -60,7 +64,41 @@ __global__ void Gemm (
 								}
 						}
 				}
-				
+
+				if (next_i < K) {
+						__pipeline_wait_prior(0);
+						__syncthreads();
+						cur ^= 1;
+				}
+		}
+#else
+		float4 ra[Config::A_LPT], rb[Config::B_LPT];
+		loader.gmem_to_reg(0, ra, rb);
+		loader.reg_to_smem(0, ra, rb, shared_a, shared_b);
+		__syncthreads();
+
+		for (int i = 0; i < K; i += Config::BK) {
+				int next_i = i + Config::BK;
+				float4 next_a[Config::A_LPT], next_b[Config::B_LPT];
+				if (next_i < K) loader.gmem_to_reg(next_i, next_a, next_b);
+
+				wmma::fragment<wmma::matrix_a, Config::WMMA_M, Config::WMMA_N, Config::WMMA_K, typename Config::In, wmma::row_major> a_frag[Config::FM];
+				wmma::fragment<wmma::matrix_b, Config::WMMA_M, Config::WMMA_N, Config::WMMA_K, typename Config::In, wmma::row_major> b_frag[Config::FN];
+
+				for (int k = 0; k < Config::BK; k += Config::WMMA_K) {
+						for (int m = 0; m < Config::FM; ++m) {
+								wmma::load_matrix_sync(a_frag[m], &shared_a[cur][wm0 + m * Config::WMMA_M][k], Config::BK + Config::PAD);
+						}
+						for (int n = 0; n < Config::FN; ++n) {
+								wmma::load_matrix_sync(b_frag[n], &shared_b[cur][k][wn0 + n * Config::WMMA_N], Config::BN + Config::PAD);
+						}
+						for (int m = 0; m < Config::FM; ++m) {
+								for (int n = 0; n < Config::FN; ++n) {
+										wmma::mma_sync(c_frag[m][n], a_frag[m], b_frag[n], c_frag[m][n]);
+								}
+						}
+				}
+
 				if (next_i < K) {
 						__syncthreads();
 						loader.reg_to_smem(cur ^ 1, next_a, next_b, shared_a, shared_b);
@@ -68,6 +106,7 @@ __global__ void Gemm (
 						cur ^= 1;
 				}
 		}
+#endif
 		__syncthreads();
 		
 		auto *smem_base = reinterpret_cast<typename Config::Acc*>(&shared_a[0][0][0]);
@@ -106,9 +145,14 @@ void launch_Gemm_forward(
 		const typename Config::Out *bias,
 		float alpha, float beta, int M, int N, int K, cudaStream_t s
 ) {
+		cudaFuncSetAttribute(
+				Gemm<Config>,
+				cudaFuncAttributeMaxDynamicSharedMemorySize,
+				Config::SMEM_BYTES
+		);
 		dim3 block(Config::THREADS);
 		dim3 grid((N + Config::BN - 1) / Config::BN, (M + Config::BM - 1) / Config::BM);
-		Gemm<Config><<<grid, block, 0, s>>>(A, B, C, bias, alpha, beta, M, N, K);
+		Gemm<Config><<<grid, block, Config::SMEM_BYTES, s>>>(A, B, C, bias, alpha, beta, M, N, K);
 }
 
 #define GEMM_FORWARD(name, InT, OutT)                                         \
