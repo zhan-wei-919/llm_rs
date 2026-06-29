@@ -20,6 +20,9 @@ struct GemmConfig {
 		static constexpr int THREADS = 32 * NWARPS;
 		static constexpr int WMMA_M = 16, WMMA_N = 16, WMMA_K = 16;
 		static constexpr int FM = WM / WMMA_M, FN = WN / WMMA_N;
+		
+		static constexpr int TM = 8;
+		static constexpr int TN = 8;
 
 		using In = InElem;
 		using Out = OutElem;

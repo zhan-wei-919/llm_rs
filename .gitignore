@@ -1,4 +1,4 @@
-/target
+**/target/
 
 # CUDA 编译产物
 kernel/**/test/test_*
