@@ -1,6 +1,10 @@
+mod cuda;
+
+pub(crate) use cuda::CudaOps;
+
 use crate::dtype::Dtype;
 
-pub trait Backend<D: Dtype> {
+pub trait Ops<D: Dtype> {
     fn embedding_forward(
         &self,
         out: *mut u8,

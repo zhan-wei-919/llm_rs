@@ -255,7 +255,7 @@ pub mod cuda {
     unsafe extern "C" {
     	pub fn cudaMalloc(devPtr: *mut *mut u8, size: usize) -> i32;
     	pub fn cudaFree(devPtr: *mut u8) -> i32;
-    	pub fn cudaMemcpy(dst: *mut u8, src: *const u8, count: usize, kind: i32) ->32;
+    	pub fn cudaMemcpy(dst: *mut u8, src: *const u8, count: usize, kind: i32) -> i32;
     }
     
     pub const MEMCPY_HOST_TO_DEVICE: i32 = 1;

@@ -29,4 +29,6 @@ fn main() {
     println!("cargo:rustc-link-search=native={out_dir}");
     println!("cargo:rustc-link-lib=static=kernels");
     println!("cargo:rustc-link-lib=dylib=cudart");
+    println!("cargo:rustc-link-search=native=/usr/local/cuda/lib64");
+    println!("cargo:rustc-link-lib=dylib=stdc++");
 }

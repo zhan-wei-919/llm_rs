@@ -1,10 +1,10 @@
 use crate::dtype::{BF16, F16, F32};
-use crate::ops::Backend;
-use crate::device::Device;
+use crate::ops::Ops;
 
-pub struct CudaBackend;
 
-impl Backend<F32> for CudaBackend {
+pub struct CudaOps;
+
+impl Ops<F32> for CudaOps {
     fn embedding_forward(
         &self,
         out: *mut u8,
@@ -151,7 +151,7 @@ impl Backend<F32> for CudaBackend {
     }
 }
 
-impl Backend<BF16> for CudaBackend {
+impl Ops<BF16> for CudaOps {
     fn embedding_forward(
         &self,
         out: *mut u8,
@@ -303,7 +303,7 @@ impl Backend<BF16> for CudaBackend {
     }
 }
 
-impl Backend<F16> for CudaBackend {
+impl Ops<F16> for CudaOps {
     fn embedding_forward(
         &self,
         out: *mut u8,
@@ -450,37 +450,3 @@ impl Backend<F16> for CudaBackend {
     }
 }
 
-
-impl Device for CudaBackend {
-    fn alloc(&self, size: usize) -> *mut u8 {
-        let mut ptr: *mut u8 = std::ptr::null_mut();
-        unsafe {
-        	kernel::cuda::cudaMalloc(&mut ptr, size);
-        }
-        ptr
-    }
-    
-    fn copy_from_device_to_device(&self, dst: *mut u8, src: *mut u8, size: usize) {
-        unsafe {
-        	kernel::cuda::cudaMemcpy(dst, src, size, 3);
-        }
-    }
-    
-    fn copy_from_device_to_host(&self, dst: *mut u8, src: *mut u8, size: usize) {
-        unsafe {
-        	kernel::cuda::cudaMemcpy(dst, src, size, 2);
-        }
-    }
-    
-    fn copy_from_host_to_device(&self, dst: *mut u8, src: *mut u8, size: usize) {
-        unsafe {
-        	kernel::cuda::cudaMemcpy(dst, src, size, 1);
-        }
-    }
-    
-    fn free(&self, ptr: *mut u8) {
-        unsafe {
-        	kernel::cuda::cudaFree(ptr);
-        }
-    }
-}

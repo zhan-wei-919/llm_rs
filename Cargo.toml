@@ -7,4 +7,4 @@ edition = "2024"
 backend = { path = "backend" }
 
 [workspace]
-members = ["kernel", "backend"]
+members = ["kernel", "backend", "tensor"]

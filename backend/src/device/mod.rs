@@ -1,3 +1,7 @@
+mod cuda;
+
+pub(crate) use cuda::CudaDevice;
+
 pub trait Device {
     fn alloc(&self, size: usize) -> *mut u8;
     fn free(&self, ptr: *mut u8);
