@@ -1,3 +1,4 @@
+#pragma once
 #include "../reduce/Reduce.cuh"
 #include <cmath>
 #include <cstddef>

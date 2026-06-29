@@ -1,168 +1,486 @@
-use crate::dtype::{F32, BF16};
+use crate::dtype::{BF16, F16, F32};
 use crate::ops::Backend;
+use crate::device::Device;
 
 pub struct CudaBackend;
 
 impl Backend<F32> for CudaBackend {
-    fn embedding_forward(&self, out: *mut u8, token_ids: *const i32, token_table: *const u8, pos_table: *const u8, b: i32, t: i32, c:i32){
-    	unsafe {
-    		kernel::cuda::embedding_forward_f32(
-    			out as *mut f32, 
-    			token_ids, 
-    			token_table as *const f32, 
-    			pos_table as *const f32, 
-    			b, t, c
-    		);
-    	}
-    }
-    
-    fn layernorm_forward(&self, out: *mut u8, mean_out: *mut f32, rstd_out: *mut f32, x: *const u8, 
-        					gamma: *const u8, beta: *const u8, b: i32, t: i32, c: i32, eps: f32) {
+    fn embedding_forward(
+        &self,
+        out: *mut u8,
+        token_ids: *const i32,
+        token_table: *const u8,
+        pos_table: *const u8,
+        b: i32,
+        t: i32,
+        c: i32,
+    ) {
         unsafe {
-        	kernel::cuda::layernorm_forward_f32(
-        		out as *mut f32, 
-        		mean_out, 
-        		rstd_out, 
-        		x as *const f32, 
-        		gamma as *const f32, 
-        		beta as *const f32, 
-        		b, t, c, eps
-        	);
+            kernel::cuda::embedding_forward_f32(
+                out as *mut f32,
+                token_ids,
+                token_table as *const f32,
+                pos_table as *const f32,
+                b,
+                t,
+                c,
+            );
         }
     }
-    
+
+    fn layernorm_forward(
+        &self,
+        out: *mut u8,
+        mean_out: *mut f32,
+        rstd_out: *mut f32,
+        x: *const u8,
+        gamma: *const u8,
+        beta: *const u8,
+        b: i32,
+        t: i32,
+        c: i32,
+        eps: f32,
+    ) {
+        unsafe {
+            kernel::cuda::layernorm_forward_f32(
+                out as *mut f32,
+                mean_out,
+                rstd_out,
+                x as *const f32,
+                gamma as *const f32,
+                beta as *const f32,
+                b,
+                t,
+                c,
+                eps,
+            );
+        }
+    }
+
     fn gelu(&self, y: *mut u8, x: *const u8, n: i32) {
         unsafe {
-        	kernel::cuda::gelu_forward_f32(y as *mut f32, x as *const f32, n, std::ptr::null_mut());
+            kernel::cuda::gelu_forward_f32(y as *mut f32, x as *const f32, n, std::ptr::null_mut());
         }
     }
-    
-    fn attention(&self, out: *mut u8, att: *mut u8, qkv: *const u8, b: i32, t: i32, c: i32, nh: i32) {
+
+    fn attention(
+        &self,
+        out: *mut u8,
+        att: *mut u8,
+        qkv: *const u8,
+        b: i32,
+        t: i32,
+        c: i32,
+        nh: i32,
+    ) {
         unsafe {
-        	kernel::cuda::attention_forward_f32(
-        		out as *mut f32, 
-        		att as *mut f32, 
-        		qkv as *const f32, 
-        		b, t, c, nh
-        	);
+            kernel::cuda::attention_forward_f32(
+                out as *mut f32,
+                att as *mut f32,
+                qkv as *const f32,
+                b,
+                t,
+                c,
+                nh,
+            );
         }
     }
-    
-    fn crossentropy_forward(&self, losses: *mut f32, probs: *mut u8, logits: *const u8, targets: *const i32, b: i32, t: i32, v: i32) {
+
+    fn crossentropy_forward(
+        &self,
+        losses: *mut f32,
+        probs: *mut u8,
+        logits: *const u8,
+        targets: *const i32,
+        b: i32,
+        t: i32,
+        v: i32,
+    ) {
         unsafe {
-        	kernel::cuda::crossentropy_forward_f32(
-        		losses, 
-        		probs as *mut f32, 
-        		logits as *const f32, 
-        		targets, 
-        		b, t, v
-        	);
+            kernel::cuda::crossentropy_forward_f32(
+                losses,
+                probs as *mut f32,
+                logits as *const f32,
+                targets,
+                b,
+                t,
+                v,
+            );
         }
     }
-    
-    fn residual_forward(&self, out: *mut u8, x1: *const u8, x2: *const u8, b: i32, t: i32, c:i32) {
+
+    fn residual_forward(&self, out: *mut u8, x1: *const u8, x2: *const u8, b: i32, t: i32, c: i32) {
         unsafe {
-        	kernel::cuda::residual_forward_f32(
-        		out as *mut f32, 
-        		x1 as *const f32, 
-        		x2 as *const f32, 
-        		b, t, c
-        	);
+            kernel::cuda::residual_forward_f32(
+                out as *mut f32,
+                x1 as *const f32,
+                x2 as *const f32,
+                b,
+                t,
+                c,
+            );
         }
     }
-    
-    fn gemm_forward(&self, a: *const u8, b: *const u8, c: *mut u8, bias: *const u8, alpha: f32, beta: f32, m: i32, n:i32, k:i32) {
+
+    fn gemm_forward(
+        &self,
+        a: *const u8,
+        b: *const u8,
+        c: *mut u8,
+        bias: *const u8,
+        alpha: f32,
+        beta: f32,
+        m: i32,
+        n: i32,
+        k: i32,
+    ) {
         unsafe {
-        	kernel::cuda::gemm_forward_f32(
-        		A as *const f32, 
-        		B as *const f32, 
-        		C as *mut f32, 
-        		bias as *const f32, 
-        		alpha, beta, M, N, K, std::ptr::null_mut());
-        	);
+            kernel::cuda::gemm_forward_f32(
+                a as *const f32,
+                b as *const f32,
+                c as *mut f32,
+                bias as *const f32,
+                alpha,
+                beta,
+                m,
+                n,
+                k,
+                std::ptr::null_mut(),
+            );
         }
     }
 }
 
 impl Backend<BF16> for CudaBackend {
-    fn embedding_forward(&self, out: *mut u8, token_ids: *const i32, token_table: *const u8, pos_table: *const u8, b: i32, t: i32, c:i32){
-    	unsafe {
-    		kernel::cuda::embedding_forward_bf16(
-    			out as *mut u16, 
-    			token_ids, 
-    			token_table as *const u16, 
-    			pos_table as *const u16, 
-    			b, t, c
-    		);
-    	}
-    }
-    
-        
-    fn layernorm_forward(&self, out: *mut u8, mean_out: *mut f32, rstd_out: *mut f32, x: *const u8, 
-        					gamma: *const u8, beta: *const u8, b: i32, t: i32, c: i32, eps: f32) {
+    fn embedding_forward(
+        &self,
+        out: *mut u8,
+        token_ids: *const i32,
+        token_table: *const u8,
+        pos_table: *const u8,
+        b: i32,
+        t: i32,
+        c: i32,
+    ) {
         unsafe {
-        	kernel::cuda::layernorm_forward_bf16(
-        		out as *mut u16, 
-        		mean_out, 
-        		rstd_out, 
-        		x as *const u16, 
-        		gamma as *const u16, 
-        		beta as *const u16, 
-        		b, t, c, eps
-        	);
+            kernel::cuda::embedding_forward_bf16(
+                out as *mut u16,
+                token_ids,
+                token_table as *const u16,
+                pos_table as *const u16,
+                b,
+                t,
+                c,
+            );
         }
     }
-    
+
+    fn layernorm_forward(
+        &self,
+        out: *mut u8,
+        mean_out: *mut f32,
+        rstd_out: *mut f32,
+        x: *const u8,
+        gamma: *const u8,
+        beta: *const u8,
+        b: i32,
+        t: i32,
+        c: i32,
+        eps: f32,
+    ) {
+        unsafe {
+            kernel::cuda::layernorm_forward_bf16(
+                out as *mut u16,
+                mean_out,
+                rstd_out,
+                x as *const u16,
+                gamma as *const u16,
+                beta as *const u16,
+                b,
+                t,
+                c,
+                eps,
+            );
+        }
+    }
+
     fn gelu(&self, y: *mut u8, x: *const u8, n: i32) {
         unsafe {
-        	kernel::cuda::gelu_forward_bf16(y as *mut u16, x as *const u16, n, std::ptr::null_mut());
-        }
-    }
-    
-    fn attention(&self, out: *mut u8, att: *mut u8, qkv: *const u8, b: i32, t: i32, c: i32, nh: i32) {
-        unsafe {
-        	kernel::cuda::attention_forward_bf16(
-        		out as *mut u16, 
-        		att as *mut u16, 
-        		qkv as *const u16, 
-        		b, t, c, nh
-        	);
-        }
-    }
-    
-    fn crossentropy_forward(&self, losses: *mut f32, probs: *mut u8, logits: *const u8, targets: *const i32, b: i32, t: i32, v: i32) {
-        unsafe {
-        	kernel::cuda::crossentropy_forward_bf16(
-        		losses, 
-        		probs as *mut u16, 
-        		logits as *const u16, 
-        		targets, 
-        		b, t, v
-        	);
-        }
-    }
-    
-    fn residual_forward(&self, out: *mut u8, x1: *const u8, x2: *const u8, b: i32, t: i32, c:i32) {
-        unsafe {
-        	kernel::cuda::residual_forward_bf16(
-        		out as *mut u16, 
-        		x1 as *const u16, 
-        		x2 as *const u16, 
-        		b, t, c
-        	);
-        }
-    }
-    
-    fn gemm_forward(&self, a: *const u8, b: *const u8, c: *mut u8, bias: *const u8, alpha: f32, beta: f32, m: i32, n:i32, k:i32) {
-        unsafe {
-        	kernel::cuda::gemm_forward_bf16(
-        		a as *const u16, 
-        		b as *const u16, 
-        		c as *mut u16, 
-        		bias as *const u16, 
-        		alpha, beta, M, N, K, std::ptr::null_mut());
+            kernel::cuda::gelu_forward_bf16(
+                y as *mut u16,
+                x as *const u16,
+                n,
+                std::ptr::null_mut(),
+            );
         }
     }
 
+    fn attention(
+        &self,
+        out: *mut u8,
+        att: *mut u8,
+        qkv: *const u8,
+        b: i32,
+        t: i32,
+        c: i32,
+        nh: i32,
+    ) {
+        unsafe {
+            kernel::cuda::attention_forward_bf16(
+                out as *mut u16,
+                att as *mut u16,
+                qkv as *const u16,
+                b,
+                t,
+                c,
+                nh,
+            );
+        }
+    }
+
+    fn crossentropy_forward(
+        &self,
+        losses: *mut f32,
+        probs: *mut u8,
+        logits: *const u8,
+        targets: *const i32,
+        b: i32,
+        t: i32,
+        v: i32,
+    ) {
+        unsafe {
+            kernel::cuda::crossentropy_forward_bf16(
+                losses,
+                probs as *mut u16,
+                logits as *const u16,
+                targets,
+                b,
+                t,
+                v,
+            );
+        }
+    }
+
+    fn residual_forward(&self, out: *mut u8, x1: *const u8, x2: *const u8, b: i32, t: i32, c: i32) {
+        unsafe {
+            kernel::cuda::residual_forward_bf16(
+                out as *mut u16,
+                x1 as *const u16,
+                x2 as *const u16,
+                b,
+                t,
+                c,
+            );
+        }
+    }
+
+    fn gemm_forward(
+        &self,
+        a: *const u8,
+        b: *const u8,
+        c: *mut u8,
+        bias: *const u8,
+        alpha: f32,
+        beta: f32,
+        m: i32,
+        n: i32,
+        k: i32,
+    ) {
+        unsafe {
+            kernel::cuda::gemm_forward_bf16(
+                a as *const u16,
+                b as *const u16,
+                c as *mut u16,
+                bias as *const u16,
+                alpha,
+                beta,
+                m,
+                n,
+                k,
+                std::ptr::null_mut(),
+            );
+        }
+    }
 }
 
+impl Backend<F16> for CudaBackend {
+    fn embedding_forward(
+        &self,
+        out: *mut u8,
+        token_ids: *const i32,
+        token_table: *const u8,
+        pos_table: *const u8,
+        b: i32,
+        t: i32,
+        c: i32,
+    ) {
+        unsafe {
+            kernel::cuda::embedding_forward_f16(
+                out as *mut u16,
+                token_ids,
+                token_table as *const u16,
+                pos_table as *const u16,
+                b,
+                t,
+                c,
+            );
+        }
+    }
+
+    fn layernorm_forward(
+        &self,
+        out: *mut u8,
+        mean_out: *mut f32,
+        rstd_out: *mut f32,
+        x: *const u8,
+        gamma: *const u8,
+        beta: *const u8,
+        b: i32,
+        t: i32,
+        c: i32,
+        eps: f32,
+    ) {
+        unsafe {
+            kernel::cuda::layernorm_forward_f16(
+                out as *mut u16,
+                mean_out,
+                rstd_out,
+                x as *const u16,
+                gamma as *const u16,
+                beta as *const u16,
+                b,
+                t,
+                c,
+                eps,
+            );
+        }
+    }
+
+    fn gelu(&self, y: *mut u8, x: *const u8, n: i32) {
+        unsafe {
+            kernel::cuda::gelu_forward_f16(y as *mut u16, x as *const u16, n, std::ptr::null_mut());
+        }
+    }
+
+    fn attention(
+        &self,
+        out: *mut u8,
+        att: *mut u8,
+        qkv: *const u8,
+        b: i32,
+        t: i32,
+        c: i32,
+        nh: i32,
+    ) {
+        unsafe {
+            kernel::cuda::attention_forward_f16(
+                out as *mut u16,
+                att as *mut u16,
+                qkv as *const u16,
+                b,
+                t,
+                c,
+                nh,
+            );
+        }
+    }
+
+    fn crossentropy_forward(
+        &self,
+        losses: *mut f32,
+        probs: *mut u8,
+        logits: *const u8,
+        targets: *const i32,
+        b: i32,
+        t: i32,
+        v: i32,
+    ) {
+        unsafe {
+            kernel::cuda::crossentropy_forward_f16(
+                losses,
+                probs as *mut u16,
+                logits as *const u16,
+                targets,
+                b,
+                t,
+                v,
+            );
+        }
+    }
+
+    fn residual_forward(&self, out: *mut u8, x1: *const u8, x2: *const u8, b: i32, t: i32, c: i32) {
+        unsafe {
+            kernel::cuda::residual_forward_f16(
+                out as *mut u16,
+                x1 as *const u16,
+                x2 as *const u16,
+                b,
+                t,
+                c,
+            );
+        }
+    }
+
+    fn gemm_forward(
+        &self,
+        a: *const u8,
+        b: *const u8,
+        c: *mut u8,
+        bias: *const u8,
+        alpha: f32,
+        beta: f32,
+        m: i32,
+        n: i32,
+        k: i32,
+    ) {
+        unsafe {
+            kernel::cuda::gemm_forward_f16(
+                a as *const u16,
+                b as *const u16,
+                c as *mut u16,
+                bias as *const u16,
+                alpha,
+                beta,
+                m,
+                n,
+                k,
+                std::ptr::null_mut(),
+            );
+        }
+    }
+}
+
+
+impl Device for CudaBackend {
+    fn alloc(&self, size: usize) -> *mut u8 {
+        let mut ptr: *mut u8 = std::ptr::null_mut();
+        unsafe {
+        	kernel::cuda::cudaMalloc(&mut ptr, size);
+        }
+        ptr
+    }
+    
+    fn copy_from_device_to_device(&self, dst: *mut u8, src: *mut u8, size: usize) {
+        unsafe {
+        	kernel::cuda::cudaMemcpy(dst, src, size, 3);
+        }
+    }
+    
+    fn copy_from_device_to_host(&self, dst: *mut u8, src: *mut u8, size: usize) {
+        unsafe {
+        	kernel::cuda::cudaMemcpy(dst, src, size, 2);
+        }
+    }
+    
+    fn copy_from_host_to_device(&self, dst: *mut u8, src: *mut u8, size: usize) {
+        unsafe {
+        	kernel::cuda::cudaMemcpy(dst, src, size, 1);
+        }
+    }
+    
+    fn free(&self, ptr: *mut u8) {
+        unsafe {
+        	kernel::cuda::cudaFree(ptr);
+        }
+    }
+}

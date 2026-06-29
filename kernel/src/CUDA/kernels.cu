@@ -1,0 +1,8 @@
+#include "embedding/add_pos_embedding.cuh"
+#include "LayerNorm/LayerNorm.cuh"
+#include "Gemm/Gemm.cuh"
+#include "Gemm/Gemm_f32.cuh"
+#include "activation/GELU.cuh"
+#include "residual/Residual.cuh"
+#include "attention/Attention.cuh"
+#include "loss/CrossEntropy.cuh"
