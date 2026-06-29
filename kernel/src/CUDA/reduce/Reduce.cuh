@@ -5,6 +5,10 @@
 __device__ inline float          device_max(float a, float b)                    { return fmaxf(a, b); }
 __device__ inline __nv_bfloat16  device_max(__nv_bfloat16 a, __nv_bfloat16 b)    { return __hmax(a, b); }
 __device__ inline half           device_max(half a, half b)                      { return __hmax(a, b); }
+__device__ inline float          device_max(float a, __nv_bfloat16 b)            { return fmaxf(a, static_cast<float>(b)); }
+__device__ inline float          device_max(__nv_bfloat16 a, float b)            { return fmaxf(static_cast<float>(a), b); }
+__device__ inline float          device_max(float a, half b)                     { return fmaxf(a, static_cast<float>(b)); }
+__device__ inline float          device_max(half a, float b)                     { return fmaxf(static_cast<float>(a), b); }
 
 template<typename T>
 __device__ inline float warp_sum(T val) {
