@@ -10,9 +10,9 @@ __global__ void add_token_and_pos_embedding(
 		const T		*__restrict__		pos_table,			// [T, C]
 		int B, int seq_len, int C
 ) {
-		int bt = blockIdx.x;		// 找到自己负责的那个token
-		int seq_pos = bt % seq_len;				// 找到这个token在句子里的位置
-		int token_id = token_ids[bt];				// 找到那个token的id, 这个id对应的是token_table里的行号
+		int bt = blockIdx.x;								// 找到自己负责的那个token
+		int seq_pos = bt % seq_len;							// 找到这个token在句子里的位置
+		int token_id = token_ids[bt];						// 找到那个token的id, 这个id对应的是token_table里的行号
 		
 		constexpr int VEC = sizeof(float4) / sizeof(T);
 		for (int c = threadIdx.x * VEC; c + VEC <= C; c += blockDim.x * VEC) {
