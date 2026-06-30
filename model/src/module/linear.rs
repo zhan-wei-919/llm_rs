@@ -1,0 +1,30 @@
+use backend::{Dtype, Backend};
+use tensor::{Tensor, Arena};
+use std::sync::Arc;
+
+pub struct Linear<D: Dtype> {
+	arena: Arc<Arena<D>>,
+	prefix: String,
+}
+
+impl<D: Dtype> Linear<D> {
+	pub fn new(arena: Arc<Arena<D>>, prefix: String, in_f: usize, out_f: usize, b: usize, t: usize) -> Self {
+		arena.alloc(format!("{prefix}.weight"), vec![out_f, in_f]);
+		arena.alloc(format!("{prefix}.bias"), vec![out_f]);
+		arena.alloc(format!("{prefix}.output"), vec![b, t, out_f]);
+		Linear{ arena, prefix }
+	}
+	
+	pub fn forward(&self, x: &Tensor<D>) {
+		let m = x.shape()[0] as i32;
+		let k = x.shape()[1] as i32;
+		let n = self.arena.shape(&format!("{}.weight", self.prefix))[0] as i32;
+		self.arena.backend.ops.gemm_forward(
+			x.as_ptr(), 
+			self.arena.get(&format!("{}.weight", self.prefix)) as *const u8, 
+			self.arena.get(&format!("{}.output", self.prefix)), 
+			self.arena.get(&format!("{}.bias", self.prefix)) as *const u8, 
+			1.0, 0.0, m, n, k
+		);
+	}
+}

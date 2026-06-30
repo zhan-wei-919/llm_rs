@@ -57,13 +57,13 @@ impl Ops<F32> for CudaOps {
         }
     }
 
-    fn gelu(&self, y: *mut u8, x: *const u8, n: i32) {
+    fn gelu_forward(&self, y: *mut u8, x: *const u8, n: i32) {
         unsafe {
             kernel::cuda::gelu_forward_f32(y as *mut f32, x as *const f32, n, std::ptr::null_mut());
         }
     }
 
-    fn attention(
+    fn attention_forward(
         &self,
         out: *mut u8,
         att: *mut u8,
@@ -204,7 +204,7 @@ impl Ops<BF16> for CudaOps {
         }
     }
 
-    fn gelu(&self, y: *mut u8, x: *const u8, n: i32) {
+    fn gelu_forward(&self, y: *mut u8, x: *const u8, n: i32) {
         unsafe {
             kernel::cuda::gelu_forward_bf16(
                 y as *mut u16,
@@ -215,7 +215,7 @@ impl Ops<BF16> for CudaOps {
         }
     }
 
-    fn attention(
+    fn attention_forward(
         &self,
         out: *mut u8,
         att: *mut u8,
@@ -356,13 +356,13 @@ impl Ops<F16> for CudaOps {
         }
     }
 
-    fn gelu(&self, y: *mut u8, x: *const u8, n: i32) {
+    fn gelu_forward(&self, y: *mut u8, x: *const u8, n: i32) {
         unsafe {
             kernel::cuda::gelu_forward_f16(y as *mut u16, x as *const u16, n, std::ptr::null_mut());
         }
     }
 
-    fn attention(
+    fn attention_forward(
         &self,
         out: *mut u8,
         att: *mut u8,

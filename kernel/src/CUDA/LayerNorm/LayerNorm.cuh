@@ -73,12 +73,12 @@ __global__ void layernorm(
 
 template<typename T>
 void launch_LayerNorm_forward(
-		T		*__restrict__		out,
-		float	*__restrict__		mean_out,
-		float	*__restrict__		rstd_out,
-		const T *__restrict__		x,
-		const T *__restrict__		gamma,
-		const T *__restrict__		beta,
+		T		*__restrict__		out,				// [B, T, C]
+		float	*__restrict__		mean_out,			// [B, T]
+		float	*__restrict__		rstd_out,			// [B, T]
+		const T *__restrict__		x,					// [B, T, C]
+		const T *__restrict__		gamma,				// [C]
+		const T *__restrict__		beta,				// [C]
 		int B, int seq_len, int C, float eps
 ) {
 		int block = 256;

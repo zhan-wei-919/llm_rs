@@ -43,11 +43,11 @@ pub trait Ops<D: Dtype> {
         k: i32,
     );
 
-    fn gelu(&self, y: *mut u8, x: *const u8, n: i32);
+    fn gelu_forward(&self, y: *mut u8, x: *const u8, n: i32);
 
     fn residual_forward(&self, out: *mut u8, x1: *const u8, x2: *const u8, b: i32, t: i32, c: i32);
 
-    fn attention(
+    fn attention_forward(
         &self,
         out: *mut u8,
         att: *mut u8,
