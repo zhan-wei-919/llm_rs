@@ -8,15 +8,15 @@ pub struct Residual<D: Dtype> {
 }
 
 impl<D: Dtype> Residual<D> {
-	fn new(arena: Arc<Arena<D>>, prefix: String, b: i32, t: i32, c: i32) -> Self {
+	pub fn new(arena: Arc<Arena<D>>, prefix: &str, b: usize, t: usize, c: usize) -> Self {
 		arena.alloc(format!("{prefix}.output"), vec![b, t, c]);
-		Residual { arena, prefix }
+		Residual { arena, prefix: prefix.to_string() }
 	}
 	
-	fn forward(&self, x1: &Tensor<D>, x2: &Tensor<D>) {
-		let b = x.shape()[0] as i32;
-		let t = x.shape()[1] as i32;
-		let c = x.shape()[2] as i32;
+	pub fn forward(&self, x1: &Tensor<D>, x2: &Tensor<D>) {
+		let b = x1.shape()[0] as i32;
+		let t = x1.shape()[1] as i32;
+		let c = x1.shape()[2] as i32;
 		
 		self.arena.backend.ops.residual_forward( //out, x1, x2, b, t, c
 			self.arena.get(&format!("{}.output", self.prefix)),
@@ -24,5 +24,10 @@ impl<D: Dtype> Residual<D> {
 			x2.as_ptr(),
 			b, t, c
 		);
+	}
+	
+	pub fn output(&self) -> Tensor<D> {
+		let name = format!("{}.output", self.prefix);
+		Tensor::new(self.arena.get(&name), self.arena.shape(&name))
 	}
 }

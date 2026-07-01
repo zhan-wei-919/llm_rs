@@ -8,13 +8,13 @@ pub struct LayerNorm<D: Dtype> {
 }
 
 impl<D: Dtype> LayerNorm<D> {
-	pub fn new(arena: Arc<Arena<D>>, prefix: String, b: usize, t: usize, c: usize) -> Self {
+	pub fn new(arena: Arc<Arena<D>>, prefix: &str, b: usize, t: usize, c: usize) -> Self {
 		arena.alloc(format!("{prefix}.gamma"), vec![c]);
 		arena.alloc(format!("{prefix}.beta"), vec![c]);
 		arena.alloc(format!("{prefix}.output"), vec![b, t, c]);
 		arena.alloc(format!("{prefix}.mean_out"), vec![b, t]);
 		arena.alloc(format!("{prefix}.rstd_out"), vec![b, t]);
-		LayerNorm { arena, prefix }
+		LayerNorm { arena, prefix: prefix.to_string() }
 	}
 	
 	pub fn forward(&self, x: &Tensor<D>, eps: f32) {
@@ -30,5 +30,10 @@ impl<D: Dtype> LayerNorm<D> {
 			self.arena.get(&format!("{}.beta", self.prefix)) as *const u8,
 			b, t, c, eps
 		);
+	}
+	
+	pub fn output(&self) -> Tensor<D> {
+		let name = format!("{}.output", self.prefix);
+		Tensor::new(self.arena.get(&name), self.arena.shape(&name))
 	}
 }
