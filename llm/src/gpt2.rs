@@ -120,6 +120,10 @@ impl GPT2<F32> {
 mod tests {
 	use super::*;
 	use backend::F32;
+	use backend::Backend;
+	use tensor::Arena;
+	use tokenizer::Tokenizer;
+	use std::sync::Arc;
 	
 	#[test]
 	#[ignore]
@@ -142,5 +146,58 @@ mod tests {
 		// pad 区必须是 0（同时验证 memset 和 out_stride 没错位）
 		assert_eq!(read_f32("lg.weight", 0, 50300, VOCAB_PAD),  0.0);
 		assert_eq!(hit, 148);
+	}
+	
+	#[test]
+	#[ignore]
+	fn test_qkv() {
+		let backend = Arc::new(Backend::<F32>::cuda());
+		let arena = Arc::new(Arena::new(backend));
+		let model = GPT2::new(arena.clone());
+		let read_qkv = |name: &str| -> Vec<f32> {
+			let mut res: Vec<f32> = vec![0.0; arena.shape(name).iter().product()];
+			let ptr: *mut u8 = res.as_mut_ptr() as *mut u8;
+			arena.backend.device.copy_from_device_to_host(ptr, arena.get(name) as *const u8, arena.shape(name).iter().product::<usize>() * 4);
+			res
+		};
+		let input = "hello world";
+		let hit = model.load_model("/home/zhanwei/project/llm_rs/weights/model.safetensors");
+		let tok = Tokenizer::new("/home/zhanwei/project/llm_rs/data/merges.txt", "/home/zhanwei/project/llm_rs/data/vocab.json");
+    	let input_ids = tok.encode(input);
+    	
+    	
+		let dev_ids = model.arena.backend.device.alloc(SEQ_LEN * 4); 
+		let mut host_ids = vec![0i32; SEQ_LEN];
+		host_ids[..input_ids.len()].copy_from_slice(&input_ids);
+		let mut ids = input_ids.to_vec();
+		for _ in 0..5 {
+			model.arena.backend.device.copy_from_host_to_device(dev_ids, host_ids.as_ptr() as *const u8, SEQ_LEN * 4);
+			model.forward(dev_ids as *const i32);
+			let next = GPT2::<F32>::argmax(&model.logits_row(ids.len() - 1)) as i32;
+			if next == EOT { break; }
+			host_ids[ids.len()] = next;
+			ids.push(next);
+		}
+		let sample1 = read_qkv("h.0.attn.c_attn.output");
+		arena.backend.device.free(dev_ids);
+		
+		let dev_ids = model.arena.backend.device.alloc(SEQ_LEN * 4); 
+		let mut host_ids = vec![0i32; SEQ_LEN];
+		host_ids[..input_ids.len()].copy_from_slice(&input_ids);
+		let mut ids = input_ids.to_vec();
+		for _ in 0..6 {
+			model.arena.backend.device.copy_from_host_to_device(dev_ids, host_ids.as_ptr() as *const u8, SEQ_LEN * 4);
+			model.forward(dev_ids as *const i32);
+			let next = GPT2::<F32>::argmax(&model.logits_row(ids.len() - 1)) as i32;
+			if next == EOT { break; }
+			host_ids[ids.len()] = next;
+			ids.push(next);
+		}
+		let sample2 = read_qkv("h.0.attn.c_attn.output");
+		arena.backend.device.free(dev_ids);
+		
+		let n = 6 * 2304;
+		assert_eq!(&sample1[..n], &sample2[..n]);
+		assert_ne!(&sample1[n..n+2304], &sample2[n..n+2304]);
 	}
 }

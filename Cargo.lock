@@ -35,6 +35,7 @@ dependencies = [
  "backend",
  "model",
  "tensor",
+ "tokenizer",
 ]
 
 [[package]]

@@ -7,3 +7,4 @@ edition = "2024"
 tensor = { path = "../tensor" }
 backend = { path = "../backend" }
 model = { path = "../model" }
+tokenizer = {path = "../tokenizer"}
