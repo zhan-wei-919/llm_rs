@@ -1,4 +1,4 @@
-use backend::{Backend, Dtype};
+use backend::{Dtype};
 use tensor::{Arena, Tensor};
 use std::sync::Arc;
 

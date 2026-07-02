@@ -7,3 +7,4 @@ pub use module::layernorm::LayerNorm;
 pub use module::linear::Linear;
 pub use module::embedding::Embedding;
 pub use module::transformer::Transformer;
+pub use module::lmhead::LmHead;

@@ -8,4 +8,6 @@ pub trait Device {
     fn copy_from_device_to_device(&self, dst: *mut u8, src: *const u8, size: usize);
     fn copy_from_device_to_host(&self, dst: *mut u8, src: *const u8, size: usize);
     fn copy_from_host_to_device(&self, dst: *mut u8, src: *const u8, size: usize);
+    fn memset(&self, dst: *mut u8, value: i32, size: usize);
+    fn synchronize(&self);
 }

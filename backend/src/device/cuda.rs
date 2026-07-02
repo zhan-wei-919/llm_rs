@@ -34,4 +34,16 @@ impl Device for CudaDevice {
         	kernel::cuda::cudaFree(ptr);
         }
     }
+    
+    fn memset(&self, dst: *mut u8, value: i32, size: usize) {
+        unsafe {
+        	kernel::cuda::cudaMemset(dst, value, size);
+        }
+    }
+    
+    fn synchronize(&self) {
+    	unsafe {
+    		kernel::cuda::cudaDeviceSynchronize();
+    	}
+    }
 }

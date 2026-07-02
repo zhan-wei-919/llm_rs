@@ -5,6 +5,10 @@ edition = "2024"
 
 [dependencies]
 backend = { path = "backend" }
+llm = { path = "llm"}
+tensor = {path = "tensor"}
+tokenizer = {path="tokenizer"}
+utils = {path = "utils"}
 
 [workspace]
-members = ["kernel", "backend", "tensor", "model", "llm"]
+members = ["kernel", "backend", "tensor", "model", "llm", "tokenizer", "utils"]

@@ -1,14 +1,19 @@
-use backend::{Dtype, Backend};
+use backend::{Dtype, F32};
 use tensor::{Tensor, Arena};
 use std::sync::Arc;
-use model::{Embedding, Transformer, Linear, LayerNorm};
+use model::{Embedding, Transformer, LayerNorm, LmHead};
+
+const VOCAB: usize = 50257;      // 真实词表
+const VOCAB_PAD: usize = 50304;  // pad 到 128 倍数，满足 gemm 的 N%4 契约
+const SEQ_LEN: usize = 1024;   // 与 new 里注册槽位的 t 一致
+const EOT: i32 = 50256;        // <|endoftext|>，生成到它就该闭嘴了
 
 pub struct GPT2<D: Dtype> {
 	arena: Arc<Arena<D>>,
 	embedding: Embedding<D>,
 	blocks: Vec<Transformer<D>>,
 	ln_f: LayerNorm<D>,
-	logits: Linear<D>,
+	logits: LmHead<D>,
 }
 
 impl<D: Dtype> GPT2<D> {
@@ -20,10 +25,10 @@ impl<D: Dtype> GPT2<D> {
 				Transformer::new(arena.clone(), &format!("h.{}", i), 1, 1024, 768, 12)
 			);
 		}
-		let ln = LayerNorm::new(arena.clone(), "ln", 1, 1024, 768);
-		let lg = Linear::new(arena.clone(), "lg", 768, 50257, 1, 1024);
+		let ln = LayerNorm::new(arena.clone(), "ln_f", 1, 1024, 768);
+		let lm = LmHead::new(arena.clone(), "lg", 768, VOCAB_PAD, 1, 1024);
 		arena.finalize();
-		GPT2 { arena, embedding: em, blocks, ln_f: ln, logits: lg }
+		GPT2 { arena, embedding: em, blocks, ln_f: ln, logits: lm }
 	}
 	
 	pub fn forward(&self, token_ids: *const i32) {
@@ -37,7 +42,105 @@ impl<D: Dtype> GPT2<D> {
 		self.logits.forward(&self.ln_f.output());
 	}
 	
+	pub fn load_model(&self, path: &str) -> usize {
+		let hit = self.arena.load_weight(path, |name| name.ends_with(".attn.bias"));
+		assert_eq!(hit, 148);
+		
+		let lg = self.arena.get("lg.weight");
+		let size = VOCAB_PAD * 768 * D::SIZE;
+		self.arena.backend.device.memset(lg, 0, size);
+		
+		self.arena.backend.ops.transpose_forward(
+			lg,
+			self.arena.get("wte.weight") as *const u8,
+			VOCAB as i32,
+			768,
+			VOCAB_PAD as i32,
+		);
+		
+		self.arena.backend.device.synchronize();
+		hit
+	}
+	
 	pub fn output(&self) -> Tensor<D> {
 		self.logits.output()
+	}
+}
+
+impl GPT2<F32> {
+	fn logits_row(&self, pos: usize) -> Vec<f32> {
+		let mut row = vec![0f32; VOCAB];
+		let src = unsafe {self.logits.output().as_ptr().add(pos * VOCAB_PAD * 4)};
+		self.arena.backend.device.copy_from_device_to_host( // dst, src, size字节
+			row.as_mut_ptr() as *mut u8, 
+			src, 
+			VOCAB * 4
+		);
+		row
+	}
+	
+	fn argmax(xs: &[f32]) -> usize {
+		let mut max_val = f32::NEG_INFINITY;
+		let mut max_idx = 0;
+		for (i, &x) in xs.iter().enumerate() {
+			if x > max_val {
+				max_idx = i;
+				max_val = x;
+			}
+		}
+		max_idx
+	}
+	
+	pub fn inference(&self, prompt_ids: &[i32], max_new_tokens: usize) -> Vec<i32> {
+		assert!(prompt_ids.len() + max_new_tokens <= SEQ_LEN);
+		let device = &self.arena.backend.device;
+		let dev_ids = device.alloc(SEQ_LEN * 4);
+		let mut host_ids = vec![0i32; SEQ_LEN];
+		host_ids[..prompt_ids.len()].copy_from_slice(prompt_ids);
+		
+		let mut ids = prompt_ids.to_vec();
+		for _ in 0..max_new_tokens {
+			device.copy_from_host_to_device( // dst, src, size
+				dev_ids,
+				host_ids.as_ptr() as *const u8,
+				SEQ_LEN * 4,
+			);
+			self.forward(dev_ids as *const i32);
+			let next = Self::argmax(&self.logits_row(ids.len() - 1)) as i32;
+			if next == EOT { break; }
+			host_ids[ids.len()] = next;
+			ids.push(next);
+		}
+		device.free(dev_ids);
+		ids
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use backend::F32;
+	
+	#[test]
+	#[ignore]
+	fn test_load_gpt2_weight() {
+		let backend = Arc::new(Backend::<F32>::cuda());
+		let arena = Arc::new(Arena::new(backend));
+		let _model = GPT2::new(arena.clone());
+		let hit = _model.load_model("/home/zhanwei/project/llm_rs/weights/model.safetensors");
+		// 转置定义：lg[k][n] == wte[n][k]。lg 行主序 [768, 50304]，wte 行主序 [50257, 768]。
+		let read_f32 = |name: &str, row: usize, col: usize, row_stride: usize| -> f32 {
+		    let mut v = [0f32; 1];
+		    let src = unsafe { (arena.get(name) as *const u8).add((row * row_stride + col) * 4) };
+		    arena.backend.device.copy_from_device_to_host(v.as_mut_ptr() as *mut u8, src, 4);
+		    v[0]
+		};
+
+		// 抽两个非平凡位置：一个靠角落，一个在深处
+		assert_eq!(read_f32("lg.weight", 1, 0, VOCAB_PAD),      read_f32("wte.weight", 0, 1, 768));
+		assert_eq!(read_f32("lg.weight", 5, 12345, VOCAB_PAD),  read_f32("wte.weight", 12345, 5, 768));
+		// pad 区必须是 0（同时验证 memset 和 out_stride 没错位）
+		assert_eq!(read_f32("lg.weight", 0, 50300, VOCAB_PAD),  0.0);
+		assert_eq!(hit, 148);
 	}
 }

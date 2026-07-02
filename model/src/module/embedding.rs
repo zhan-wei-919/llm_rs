@@ -1,4 +1,4 @@
-use backend::{Dtype, Backend};
+use backend::{Dtype};
 use tensor::{Tensor, Arena};
 use std::sync::Arc;
 
@@ -9,8 +9,10 @@ pub struct Embedding<D: Dtype> {
 
 impl<D: Dtype> Embedding<D> {
 	pub fn new(arena: Arc<Arena<D>>, prefix: &str, b: usize, t: usize, c: usize, v: usize) -> Self {
-		arena.alloc(format!("{prefix}.token_table"), vec![v, c]);
-		arena.alloc(format!("{prefix}.pos_table"), vec![t, c]);
+		// wte/wpe 是 HF checkpoint 里的顶层名，写死以便哑加载循环按名命中；
+		// prefix 只用于激活输出，激活不进文件。
+		arena.alloc("wte.weight".to_string(), vec![v, c]);
+		arena.alloc("wpe.weight".to_string(), vec![t, c]);
 		arena.alloc(format!("{prefix}.output"), vec![b, t, c]);
 		Embedding{ arena, prefix: prefix.to_string() }
 	}
@@ -22,8 +24,8 @@ impl<D: Dtype> Embedding<D> {
 		self.arena.backend.ops.embedding_forward(	// out, token_ids, token_table, pos_table, b, t, c
 			self.arena.get(&format!("{}.output", self.prefix)),
 			token_ids,
-			self.arena.get(&format!("{}.token_table", self.prefix)) as *const u8,
-			self.arena.get(&format!("{}.pos_table", self.prefix)) as *const u8,
+			self.arena.get("wte.weight") as *const u8,
+			self.arena.get("wpe.weight") as *const u8,
 			b, t, c
 		);
 	}

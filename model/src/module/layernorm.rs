@@ -1,4 +1,4 @@
-use backend::{Dtype, Backend};
+use backend::{Dtype};
 use tensor::{Tensor, Arena};
 use std::sync::Arc;
 
@@ -9,8 +9,9 @@ pub struct LayerNorm<D: Dtype> {
 
 impl<D: Dtype> LayerNorm<D> {
 	pub fn new(arena: Arc<Arena<D>>, prefix: &str, b: usize, t: usize, c: usize) -> Self {
-		arena.alloc(format!("{prefix}.gamma"), vec![c]);
-		arena.alloc(format!("{prefix}.beta"), vec![c]);
+		// gamma/beta 在 HF checkpoint 里叫 weight/bias，名字对齐后哑加载循环才能命中
+		arena.alloc(format!("{prefix}.weight"), vec![c]);
+		arena.alloc(format!("{prefix}.bias"), vec![c]);
 		arena.alloc(format!("{prefix}.output"), vec![b, t, c]);
 		arena.alloc(format!("{prefix}.mean_out"), vec![b, t]);
 		arena.alloc(format!("{prefix}.rstd_out"), vec![b, t]);
@@ -26,8 +27,8 @@ impl<D: Dtype> LayerNorm<D> {
 			self.arena.get(&format!("{}.mean_out", self.prefix)) as *mut f32,
 			self.arena.get(&format!("{}.rstd_out", self.prefix)) as *mut f32,
 			x.as_ptr(),
-			self.arena.get(&format!("{}.gamma", self.prefix)) as *const u8,
-			self.arena.get(&format!("{}.beta", self.prefix)) as *const u8,
+			self.arena.get(&format!("{}.weight", self.prefix)) as *const u8,
+			self.arena.get(&format!("{}.bias", self.prefix)) as *const u8,
 			b, t, c, eps
 		);
 	}

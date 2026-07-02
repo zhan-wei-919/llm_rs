@@ -250,12 +250,39 @@ pub mod cuda {
         );
     }
     
+    // --- transpose ---
+    unsafe extern "C" {
+    	pub fn transpose_forward_f32(
+    		out: *mut f32,
+    		input: *const f32,
+    		R: i32,
+    		C: i32,
+    		out_stride: i32,
+    	);
+    	pub fn transpose_forward_bf16(
+    		out: *mut bf16,
+    		input: *const bf16,
+    		R: i32,
+    		C: i32,
+    		out_stride: i32,
+    	);
+    	pub fn transpose_forward_f16(
+    		out: *mut f16,
+    		input: *const f16,
+    		R: i32,
+    		C: i32,
+    		out_stride: i32,
+    	);
+    }
+    
     // ---- CUDA Runtime API ----
     
     unsafe extern "C" {
     	pub fn cudaMalloc(devPtr: *mut *mut u8, size: usize) -> i32;
     	pub fn cudaFree(devPtr: *mut u8) -> i32;
     	pub fn cudaMemcpy(dst: *mut u8, src: *const u8, count: usize, kind: i32) -> i32;
+    	pub fn cudaMemset(devPtr: *mut u8, value: i32, count: usize) -> i32;
+    	pub fn cudaDeviceSynchronize() ->i32;
     }
     
     pub const MEMCPY_HOST_TO_DEVICE: i32 = 1;

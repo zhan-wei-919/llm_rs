@@ -1,5 +1,6 @@
 use backend::{Dtype, Backend};
 use std::collections::HashMap;
+use utils::safetensors::{load_safetensors, dtype_size};
 use std::sync::Arc;
 use std::cell::RefCell;
 
@@ -19,7 +20,7 @@ impl<D: Dtype> Arena<D> {
     	let numel: usize = shape.iter().product();
     	let size = (numel * D::SIZE + 255) & !255;
     	self.entries.borrow_mut().insert(name, (*self.offset.borrow(), shape));
-    	self.offset.borrow_mut() += size
+    	*self.offset.borrow_mut() += size
     }
     
     pub fn shape(&self, name: &str) -> Vec<usize> {
@@ -35,6 +36,24 @@ impl<D: Dtype> Arena<D> {
     	let offset = self.entries.borrow().get(name).unwrap().0;
     	unsafe { ptr.add(offset) }
     }
+    
+	pub fn load_weight(&self, path: &str, skip: impl Fn(&str) -> bool) -> usize {
+    	let infos = load_safetensors(path).unwrap();
+	    let bytes = std::fs::read(path).unwrap();
+	    let entries = self.entries.borrow();
+	    let mut hit = 0;
+	    for info in &infos {
+	    	if skip(&info.name) {continue;}
+	        let (_, shape) = entries.get(&info.name)
+	            .unwrap_or_else(|| panic!("文件 tensor {} 在 arena 中不存在", info.name));
+	        assert_eq!(shape, &info.shape, "{} 两边 shape 不一致", info.name);
+	        assert_eq!(dtype_size(&info.dtype), Some(D::SIZE), "{} dtype 不匹配", info.name);
+	        let src = &bytes[info.start..info.end];
+	        self.backend.device.copy_from_host_to_device(self.get(&info.name), src.as_ptr(), src.len());
+	        hit += 1;
+	    }
+	    hit
+	}
 }
 
 impl<D: Dtype> Drop for Arena<D> {
@@ -42,3 +61,5 @@ impl<D: Dtype> Drop for Arena<D> {
         if let Some(ptr) = *self.ptr.borrow() {self.backend.device.free(ptr);}
     }
 }
+
+

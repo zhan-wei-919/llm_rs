@@ -1,7 +1,9 @@
 fn main() {
     let out_dir = std::env::var("OUT_DIR").unwrap();
 
-    std::process::Command::new("nvcc")
+
+        
+    let status = std::process::Command::new("nvcc")
         .args(&[
             "--compiler-options",
             "-fPIC",
@@ -16,6 +18,8 @@ fn main() {
         ])
         .status()
         .unwrap();
+        
+    assert!(status.success(), "nvcc 编译失败");
 
     std::process::Command::new("ar")
         .args(&[

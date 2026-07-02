@@ -1,4 +1,4 @@
-use backend::{Dtype, Backend};
+use backend::{Dtype};
 use tensor::{Tensor, Arena};
 use std::sync::Arc;
 
@@ -8,8 +8,8 @@ pub struct Gelu<D: Dtype> {
 }
 
 impl<D: Dtype> Gelu<D> {
-	pub fn new(arena: Arc<Arena<D>>, prefix: &str, n: usize) -> Self {
-		arena.alloc(format!("{prefix}.output"), vec![n]);
+	pub fn new(arena: Arc<Arena<D>>, prefix: &str, b: usize, t: usize, c: usize) -> Self {
+		arena.alloc(format!("{prefix}.output"), vec![b ,t, c]);
 		Gelu { arena, prefix: prefix.to_string() }
 	}
 	

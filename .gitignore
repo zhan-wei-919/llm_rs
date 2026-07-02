@@ -5,3 +5,5 @@ kernel/**/test/test_*
 !kernel/**/test/test_*.cu
 *.o
 *.ncu-rep
+data/
+weights/

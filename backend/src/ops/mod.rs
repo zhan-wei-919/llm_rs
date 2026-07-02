@@ -29,7 +29,14 @@ pub trait Ops<D: Dtype> {
         c: i32,
         eps: f32,
     );
-
+    
+    /// C[m,n] = alpha * A[m,k] @ B[k,n] + beta * C[m,n] (+ bias)
+    ///
+    /// a: 激活值 也就是传入的x. 高维张量一律摊平视为二维：k = 最后一维，m = 其余维的乘积
+    ///    如 x 为 [批, 序列, 768]，则 m = 批*序列，k = 768；
+    /// b: 权重，行主序 [k, n]，与 safetensors 里 Conv1D 的存储布局一致，原样加载即可用
+    /// c: 输出，摊平视为 [m, n]；beta != 0 时会读入旧值累加
+    /// bias: 长度 n，按行广播；传 null 则跳过
     fn gemm_forward(
         &self,
         a: *const u8,
@@ -67,5 +74,14 @@ pub trait Ops<D: Dtype> {
         b: i32,
         t: i32,
         v: i32,
+    );
+    
+    fn transpose_forward(
+    	&self,
+    	out: *mut u8,
+    	input: *const u8,
+    	r: i32,
+    	c: i32,
+    	out_stride: i32,
     );
 }

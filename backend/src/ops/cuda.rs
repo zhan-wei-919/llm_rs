@@ -149,6 +149,25 @@ impl Ops<F32> for CudaOps {
             );
         }
     }
+    
+    fn transpose_forward(
+    	&self,
+    	out: *mut u8,
+    	input: *const u8,
+    	r: i32,
+    	c: i32,
+    	out_stride: i32,
+    ){
+    	unsafe {
+    		kernel::cuda::transpose_forward_f32(
+    			out as *mut f32,
+    			input as *const f32,
+    			r,
+    			c,
+    			out_stride,
+    		);
+    	}
+    }
 }
 
 impl Ops<BF16> for CudaOps {
@@ -301,6 +320,25 @@ impl Ops<BF16> for CudaOps {
             );
         }
     }
+    
+    fn transpose_forward(
+    	&self,
+    	out: *mut u8,
+    	input: *const u8,
+    	r: i32,
+    	c: i32,
+    	out_stride: i32,
+    ){
+    	unsafe {
+    		kernel::cuda::transpose_forward_bf16(
+    			out as *mut u16,
+    			input as *const u16,
+    			r,
+    			c,
+    			out_stride,
+    		);
+    	}
+    }
 }
 
 impl Ops<F16> for CudaOps {
@@ -447,6 +485,25 @@ impl Ops<F16> for CudaOps {
                 std::ptr::null_mut(),
             );
         }
+    }
+    
+    fn transpose_forward(
+    	&self,
+    	out: *mut u8,
+    	input: *const u8,
+    	r: i32,
+    	c: i32,
+    	out_stride: i32,
+    ){
+    	unsafe {
+    		kernel::cuda::transpose_forward_f16(
+    			out as *mut u16,
+    			input as *const u16,
+    			r,
+    			c,
+    			out_stride,
+    		);
+    	}
     }
 }
 

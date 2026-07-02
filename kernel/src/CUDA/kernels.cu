@@ -6,3 +6,4 @@
 #include "residual/Residual.cuh"
 #include "attention/Attention.cuh"
 #include "loss/CrossEntropy.cuh"
+#include "transpose/Transpose.cuh"
