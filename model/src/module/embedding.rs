@@ -30,8 +30,26 @@ impl<D: Dtype> Embedding<D> {
 		);
 	}
 	
+	pub fn forward_decode(&self, token_id: *const i32, pos: usize) {
+		let c = self.arena.shape(&format!("{}.output", self.prefix))[2];
+		let wpe = unsafe {(self.arena.get("wpe.weight") as *mut u8).add(pos * C * D::SIZE)};
+		self.arena.backend.ops.embedding_forward(
+			self.arena.get(&format!("{}.output", self.prefix)), 
+			token_id, 
+			self.arena.get("wte.weight") as *const u8, 
+			wpe, 
+			1, 1, c
+		);
+	}
+	
 	pub fn output(&self) -> Tensor<D> {
 		let name = format!("{}.output", self.prefix);
 		Tensor::new(self.arena.get(&name), self.arena.shape(&name))
+	}
+	
+	pub fn output_decode(&self) -> Tensor<D> {
+		let name = format!("{}.output", self.prefix);
+		let c = self.arena.shape(&name)[2];
+		Tensor::new(self.arena.get(&name), vec![1, 1, c]);
 	}
 }

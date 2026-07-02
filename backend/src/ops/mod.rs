@@ -84,4 +84,23 @@ pub trait Ops<D: Dtype> {
     	c: i32,
     	out_stride: i32,
     );
+    
+    fn gather_kv_forward(
+    	&self,
+    	k_cache: *mut u8,
+    	v_cache: *mut u8,
+    	qkv: *const u8,
+    	t: i32,
+    	c: i32,
+    	dst_start: i32,
+    );
+    
+    fn attention_decode_forward(
+    	&self,
+    	out: *mut u8,
+    	qkv: *const u8,
+   		k_cache: *const u8,
+   		v_cache: *const u8,
+   		cur_len: i32, c: i32, nh: i32
+    );
 }

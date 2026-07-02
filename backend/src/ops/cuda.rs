@@ -168,6 +168,44 @@ impl Ops<F32> for CudaOps {
     		);
     	}
     }
+    
+    fn gather_kv_forward(
+    	&self,
+    	k_cache: *mut u8,
+    	v_cache: *mut u8,
+    	qkv: *const u8,
+    	t: i32,
+    	c: i32,
+    	dst_start: i32,
+    ) {
+    	unsafe {
+    		kernel::cuda::gather_kv_forward_f32(
+    			k_cache as *mut f32, 
+    			v_cache as *mut f32, 
+    			qkv as *const f32, 
+    			t, c, dst_start
+    		);
+    	}
+    }
+    
+    fn attention_decode_forward(
+    	&self,
+    	out: *mut u8,
+    	qkv: *const u8,
+   		k_cache: *const u8,
+   		v_cache: *const u8,
+   		cur_len: i32, c: i32, nh: i32
+    ){
+    	unsafe {
+    		kernel::cuda::attention_decode_forward_f32(
+    			out as *mut f32,
+    			qkv as *const f32,
+    			k_cache as *const f32,
+    			v_cache as *const f32,
+    			cur_len, c, nh
+    		);
+    	}
+    }
 }
 
 impl Ops<BF16> for CudaOps {
@@ -339,6 +377,44 @@ impl Ops<BF16> for CudaOps {
     		);
     	}
     }
+    
+    fn gather_kv_forward(
+    	&self,
+    	k_cache: *mut u8,
+    	v_cache: *mut u8,
+    	qkv: *const u8,
+    	t: i32,
+    	c: i32,
+    	dst_start: i32,
+    ) {
+    	unsafe {
+    		kernel::cuda::gather_kv_forward_bf16(
+    			k_cache as *mut u16, 
+    			v_cache as *mut u16, 
+    			qkv as *const u16, 
+    			t, c, dst_start
+    		);
+    	}
+    }
+    
+    fn attention_decode_forward(
+    	&self,
+    	out: *mut u8,
+    	qkv: *const u8,
+   		k_cache: *const u8,
+   		v_cache: *const u8,
+   		cur_len: i32, c: i32, nh: i32
+    ){
+    	unsafe {
+    		kernel::cuda::attention_decode_forward_bf16(
+    			out as *mut u16,
+    			qkv as *const u16,
+    			k_cache as *const u16,
+    			v_cache as *const u16,
+    			cur_len, c, nh
+    		);
+    	}
+    }
 }
 
 impl Ops<F16> for CudaOps {
@@ -505,5 +581,85 @@ impl Ops<F16> for CudaOps {
     		);
     	}
     }
+    
+    fn gather_kv_forward(
+    	&self,
+    	k_cache: *mut u8,
+    	v_cache: *mut u8,
+    	qkv: *const u8,
+    	t: i32,
+    	c: i32,
+    	dst_start: i32,
+    ) {
+    	unsafe {
+    		kernel::cuda::gather_kv_forward_f16(
+    			k_cache as *mut u16, 
+    			v_cache as *mut u16, 
+    			qkv as *const u16, 
+    			t, c, dst_start
+    		);
+    	}
+    }
+    
+    fn attention_decode_forward(
+    	&self,
+    	out: *mut u8,
+    	qkv: *const u8,
+   		k_cache: *const u8,
+   		v_cache: *const u8,
+   		cur_len: i32, c: i32, nh: i32
+    ){
+    	unsafe {
+    		kernel::cuda::attention_decode_forward_f16(
+    			out as *mut u16,
+    			qkv as *const u16,
+    			k_cache as *const u16,
+    			v_cache as *const u16,
+    			cur_len, c, nh
+    		);
+    	}
+    }
 }
 
+
+#[cfg(test)]
+mod tests{
+	use crate::{Backend, F32};
+	
+	#[test]
+	#[ignore]
+	fn test_attention_decode() {
+		let backend = Backend::<F32>::cuda();
+		let device = &backend.device;
+		let ops = &backend.ops;
+		
+		
+		for t in [1, 7, 256, 257] {
+			let qkv_input: Vec<f32> = (0..t * 3 * 768).map(|i| ((i * 37) % 256) as f32 / 256.0 - 0.5).collect();
+			let qkv_ptr: *const u8 = qkv_input.as_ptr() as *const u8;
+			let att_out = device.alloc(1*12*t*t*4);
+			let attention_out = device.alloc(1*t*768*4);
+			let attn_qkv = device.alloc(1*t*768*3*4);
+			device.copy_from_host_to_device(attn_qkv, qkv_ptr, 1*t*768*3*4);
+			ops.attention_forward(attention_out, att_out, attn_qkv, 1, t as i32, 768, 12);
+			let mut sample1 = vec![0f32; 1*t*768];
+			let sample1_ptr: *mut u8 = sample1.as_mut_ptr() as *mut u8;
+			device.copy_from_device_to_host(sample1_ptr, attention_out, 1*t*768*4);
+			
+			let k_cache = device.alloc(1*t*768*4);
+			let v_cache = device.alloc(1*t*768*4);
+			
+			let mut sample2 = vec![0f32; 768];
+			let sample2_ptr: *mut u8 = sample2.as_mut_ptr() as *mut u8;
+			
+			for i in 0..t {
+				let row = unsafe { (attn_qkv as *const u8).add(i * 3 * 768 * 4) };
+				ops.gather_kv_forward(k_cache, v_cache, row, 1, 768, i as i32);
+				ops.attention_decode_forward(attention_out, row, k_cache, v_cache, (i + 1) as i32, 768, 12);
+				device.copy_from_device_to_host(sample2_ptr, attention_out, 768*4);
+    			assert_eq!(sample2, sample1[i * 768..(i + 1) * 768], "t={t}, 位置 i={i} 分叉");
+			}
+
+		}
+	}
+}

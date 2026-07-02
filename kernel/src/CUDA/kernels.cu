@@ -7,3 +7,5 @@
 #include "attention/Attention.cuh"
 #include "loss/CrossEntropy.cuh"
 #include "transpose/Transpose.cuh"
+#include "attention/Gather_kv.cuh"
+#include "attention/Attention_decode.cuh"

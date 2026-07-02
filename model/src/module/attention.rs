@@ -11,6 +11,8 @@ impl<D: Dtype> Attention<D> {
 	pub fn new(arena: Arc<Arena<D>>, prefix: &str, b: usize, t: usize, c: usize, nh: usize) -> Self {
 		arena.alloc(format!("{prefix}.output"), vec![b, t, c]);
 		arena.alloc(format!("{prefix}.att"), vec![b, nh, t, t]);
+		arena.alloc(format!("{prefix}.k_cache"), vec![t, c]);
+		arena.alloc(format!("{prefix}.v_cache"), vec![t, c]);
 		Attention { arena, prefix: prefix.to_string() }
 	}
 	

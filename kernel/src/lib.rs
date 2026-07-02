@@ -218,6 +218,31 @@ pub mod cuda {
             NH: i32,
         );
     }
+    
+    // --- Attention Decode ---
+    unsafe extern "C" {
+    	pub fn attention_decode_forward_f32(
+    		out: *mut f32,
+    		qkv: *const f32,
+    		k_cache: *const f32,
+    		v_cache: *const f32,
+    		cur_len: i32, c: i32, nh: i32
+    	);
+    	pub fn attention_decode_forward_bf16(
+    		out: *mut bf16,
+    		qkv: *const bf16,
+    		k_cache: *const bf16,
+    		v_cache: *const bf16,
+    		cur_len: i32, c: i32, nh: i32
+    	);
+    	pub fn attention_decode_forward_f16(
+    		out: *mut f16,
+    		qkv: *const f16,
+    		k_cache: *const f16,
+    		v_cache: *const f16,
+    		cur_len: i32, c: i32, nh: i32
+    	);
+    }
 
     // ---- CrossEntropy ----
     unsafe extern "C" {
@@ -272,6 +297,34 @@ pub mod cuda {
     		R: i32,
     		C: i32,
     		out_stride: i32,
+    	);
+    }
+    
+    // --- gather_kv ---
+    unsafe extern "C" {
+    	pub fn gather_kv_forward_f32(
+    		k_cache: *mut f32,
+    		v_cache: *mut f32,
+    		qkv: *const f32,
+    		t: i32,
+    		c: i32,
+    		dst_start: i32,
+    	);
+    	pub fn gather_kv_forward_bf16(
+    		k_cache: *mut bf16,
+    		v_cache: *mut bf16,
+    		qkv: *const bf16,
+    		t: i32,
+    		c: i32,
+    		dst_start: i32,
+    	);
+    	pub fn gather_kv_forward_f16(
+    		k_cache: *mut f16,
+    		v_cache: *mut f16,
+    		qkv: *const f16,
+    		t: i32,
+    		c: i32,
+    		dst_start: i32,
     	);
     }
     
