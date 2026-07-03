@@ -9,3 +9,8 @@
 #include "transpose/Transpose.cuh"
 #include "attention/Gather_kv.cuh"
 #include "attention/Attention_decode.cuh"
+#include "LayerNorm/RMSNorm.cuh"
+#include "embedding/RoPE.cuh"
+#include "attention/GQAttention_prefill.cuh"
+#include "attention/GQAttention_decode.cuh"
+#include "activation/SwiGLU.cuh"

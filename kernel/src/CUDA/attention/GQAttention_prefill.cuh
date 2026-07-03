@@ -69,14 +69,15 @@ void launch_gq_attention_prefill(
 	gq_attention_prefill<T><<<grid, block>>>(out, q, k, v, seq_len, NH, NKV, HS);
 }
 
-#define QG_ATTENTION_FORWARD(name, InT)                                           \
-	extern "C" void gq_attention_prefill_##name(InT *out, InT *q, InT *k, InT *v,  \
-	                                         int b, int seq_len, int nh, int nkv, int hs) {              \
-		launch_gq_attention_prefill(out, q, k, v, b, seq_len, nh, nkv, hs);         \
+#define GQ_ATTENTION_PREFILL_FORWARD(name, InT)                                   \
+	extern "C" void gq_attention_prefill_forward_##name(                      \
+	    InT *out, const InT *q, const InT *k, const InT *v,                    \
+	    int b, int seq_len, int nh, int nkv, int hs) {                         \
+		launch_gq_attention_prefill(out, q, k, v, b, seq_len, nh, nkv, hs); \
 	}
 
-QG_ATTENTION_FORWARD(bf16, __nv_bfloat16)
-QG_ATTENTION_FORWARD(f16, half)
-QG_ATTENTION_FORWARD(f32, float)
+GQ_ATTENTION_PREFILL_FORWARD(bf16, __nv_bfloat16)
+GQ_ATTENTION_PREFILL_FORWARD(f16, half)
+GQ_ATTENTION_PREFILL_FORWARD(f32, float)
 
-#undef QG_ATTENTION_FORWARD
+#undef GQ_ATTENTION_PREFILL_FORWARD

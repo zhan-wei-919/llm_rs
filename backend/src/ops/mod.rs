@@ -98,4 +98,55 @@ pub trait Ops<D: Dtype> {
 		c: i32,
 		nh: i32,
 	);
+
+	fn rmsnorm_forward(
+		&self,
+		out: *mut u8,
+		x: *const u8,
+		gamma: *const u8,
+		b: i32,
+		t: i32,
+		c: i32,
+		eps: f32,
+	);
+
+	/// 原地旋转 x 的前 t 个 token；cos/sin 表恒为 f32，行数上限 max_seq
+	fn rope_forward(
+		&self,
+		x: *mut u8,
+		cos_table: *const f32,
+		sin_table: *const f32,
+		t: i32,
+		n_heads: i32,
+		hs: i32,
+		pos0: i32,
+		max_seq: i32,
+	);
+
+	fn gq_attention_prefill_forward(
+		&self,
+		out: *mut u8,
+		q: *const u8,
+		k: *const u8,
+		v: *const u8,
+		b: i32,
+		t: i32,
+		nh: i32,
+		nkv: i32,
+		hs: i32,
+	);
+
+	fn gq_attention_decode_forward(
+		&self,
+		out: *mut u8,
+		q: *const u8,
+		k_cache: *const u8,
+		v_cache: *const u8,
+		cur_len: i32,
+		nh: i32,
+		nkv: i32,
+		hs: i32,
+	);
+
+	fn silu_mul_forward(&self, out: *mut u8, gate: *const u8, up: *const u8, n: i32);
 }

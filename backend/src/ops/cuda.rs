@@ -204,6 +204,118 @@ impl Ops<F32> for CudaOps {
 			);
 		}
 	}
+
+	fn rmsnorm_forward(
+		&self,
+		out: *mut u8,
+		x: *const u8,
+		gamma: *const u8,
+		b: i32,
+		t: i32,
+		c: i32,
+		eps: f32,
+	) {
+		unsafe {
+			kernel::cuda::rmsnorm_forward_f32(
+				out as *mut f32,
+				x as *const f32,
+				gamma as *const f32,
+				b,
+				t,
+				c,
+				eps,
+			);
+		}
+	}
+
+	fn rope_forward(
+		&self,
+		x: *mut u8,
+		cos_table: *const f32,
+		sin_table: *const f32,
+		t: i32,
+		n_heads: i32,
+		hs: i32,
+		pos0: i32,
+		max_seq: i32,
+	) {
+		unsafe {
+			kernel::cuda::rope_forward_f32(
+				x as *mut f32,
+				cos_table,
+				sin_table,
+				t,
+				n_heads,
+				hs,
+				pos0,
+				max_seq,
+			);
+		}
+	}
+
+	fn gq_attention_prefill_forward(
+		&self,
+		out: *mut u8,
+		q: *const u8,
+		k: *const u8,
+		v: *const u8,
+		b: i32,
+		t: i32,
+		nh: i32,
+		nkv: i32,
+		hs: i32,
+	) {
+		unsafe {
+			kernel::cuda::gq_attention_prefill_forward_f32(
+				out as *mut f32,
+				q as *const f32,
+				k as *const f32,
+				v as *const f32,
+				b,
+				t,
+				nh,
+				nkv,
+				hs,
+			);
+		}
+	}
+
+	fn gq_attention_decode_forward(
+		&self,
+		out: *mut u8,
+		q: *const u8,
+		k_cache: *const u8,
+		v_cache: *const u8,
+		cur_len: i32,
+		nh: i32,
+		nkv: i32,
+		hs: i32,
+	) {
+		unsafe {
+			kernel::cuda::gq_attention_decode_forward_f32(
+				out as *mut f32,
+				q as *const f32,
+				k_cache as *const f32,
+				v_cache as *const f32,
+				cur_len,
+				nh,
+				nkv,
+				hs,
+			);
+		}
+	}
+
+	fn silu_mul_forward(&self, out: *mut u8, gate: *const u8, up: *const u8, n: i32) {
+		unsafe {
+			kernel::cuda::silu_mul_forward_f32(
+				out as *mut f32,
+				gate as *const f32,
+				up as *const f32,
+				n,
+				std::ptr::null_mut(),
+			);
+		}
+	}
 }
 
 impl Ops<BF16> for CudaOps {
@@ -412,6 +524,118 @@ impl Ops<BF16> for CudaOps {
 			);
 		}
 	}
+
+	fn rmsnorm_forward(
+		&self,
+		out: *mut u8,
+		x: *const u8,
+		gamma: *const u8,
+		b: i32,
+		t: i32,
+		c: i32,
+		eps: f32,
+	) {
+		unsafe {
+			kernel::cuda::rmsnorm_forward_bf16(
+				out as *mut u16,
+				x as *const u16,
+				gamma as *const u16,
+				b,
+				t,
+				c,
+				eps,
+			);
+		}
+	}
+
+	fn rope_forward(
+		&self,
+		x: *mut u8,
+		cos_table: *const f32,
+		sin_table: *const f32,
+		t: i32,
+		n_heads: i32,
+		hs: i32,
+		pos0: i32,
+		max_seq: i32,
+	) {
+		unsafe {
+			kernel::cuda::rope_forward_bf16(
+				x as *mut u16,
+				cos_table,
+				sin_table,
+				t,
+				n_heads,
+				hs,
+				pos0,
+				max_seq,
+			);
+		}
+	}
+
+	fn gq_attention_prefill_forward(
+		&self,
+		out: *mut u8,
+		q: *const u8,
+		k: *const u8,
+		v: *const u8,
+		b: i32,
+		t: i32,
+		nh: i32,
+		nkv: i32,
+		hs: i32,
+	) {
+		unsafe {
+			kernel::cuda::gq_attention_prefill_forward_bf16(
+				out as *mut u16,
+				q as *const u16,
+				k as *const u16,
+				v as *const u16,
+				b,
+				t,
+				nh,
+				nkv,
+				hs,
+			);
+		}
+	}
+
+	fn gq_attention_decode_forward(
+		&self,
+		out: *mut u8,
+		q: *const u8,
+		k_cache: *const u8,
+		v_cache: *const u8,
+		cur_len: i32,
+		nh: i32,
+		nkv: i32,
+		hs: i32,
+	) {
+		unsafe {
+			kernel::cuda::gq_attention_decode_forward_bf16(
+				out as *mut u16,
+				q as *const u16,
+				k_cache as *const u16,
+				v_cache as *const u16,
+				cur_len,
+				nh,
+				nkv,
+				hs,
+			);
+		}
+	}
+
+	fn silu_mul_forward(&self, out: *mut u8, gate: *const u8, up: *const u8, n: i32) {
+		unsafe {
+			kernel::cuda::silu_mul_forward_bf16(
+				out as *mut u16,
+				gate as *const u16,
+				up as *const u16,
+				n,
+				std::ptr::null_mut(),
+			);
+		}
+	}
 }
 
 impl Ops<F16> for CudaOps {
@@ -612,6 +836,118 @@ impl Ops<F16> for CudaOps {
 				cur_len,
 				c,
 				nh,
+			);
+		}
+	}
+
+	fn rmsnorm_forward(
+		&self,
+		out: *mut u8,
+		x: *const u8,
+		gamma: *const u8,
+		b: i32,
+		t: i32,
+		c: i32,
+		eps: f32,
+	) {
+		unsafe {
+			kernel::cuda::rmsnorm_forward_f16(
+				out as *mut u16,
+				x as *const u16,
+				gamma as *const u16,
+				b,
+				t,
+				c,
+				eps,
+			);
+		}
+	}
+
+	fn rope_forward(
+		&self,
+		x: *mut u8,
+		cos_table: *const f32,
+		sin_table: *const f32,
+		t: i32,
+		n_heads: i32,
+		hs: i32,
+		pos0: i32,
+		max_seq: i32,
+	) {
+		unsafe {
+			kernel::cuda::rope_forward_f16(
+				x as *mut u16,
+				cos_table,
+				sin_table,
+				t,
+				n_heads,
+				hs,
+				pos0,
+				max_seq,
+			);
+		}
+	}
+
+	fn gq_attention_prefill_forward(
+		&self,
+		out: *mut u8,
+		q: *const u8,
+		k: *const u8,
+		v: *const u8,
+		b: i32,
+		t: i32,
+		nh: i32,
+		nkv: i32,
+		hs: i32,
+	) {
+		unsafe {
+			kernel::cuda::gq_attention_prefill_forward_f16(
+				out as *mut u16,
+				q as *const u16,
+				k as *const u16,
+				v as *const u16,
+				b,
+				t,
+				nh,
+				nkv,
+				hs,
+			);
+		}
+	}
+
+	fn gq_attention_decode_forward(
+		&self,
+		out: *mut u8,
+		q: *const u8,
+		k_cache: *const u8,
+		v_cache: *const u8,
+		cur_len: i32,
+		nh: i32,
+		nkv: i32,
+		hs: i32,
+	) {
+		unsafe {
+			kernel::cuda::gq_attention_decode_forward_f16(
+				out as *mut u16,
+				q as *const u16,
+				k_cache as *const u16,
+				v_cache as *const u16,
+				cur_len,
+				nh,
+				nkv,
+				hs,
+			);
+		}
+	}
+
+	fn silu_mul_forward(&self, out: *mut u8, gate: *const u8, up: *const u8, n: i32) {
+		unsafe {
+			kernel::cuda::silu_mul_forward_f16(
+				out as *mut u16,
+				gate as *const u16,
+				up as *const u16,
+				n,
+				std::ptr::null_mut(),
 			);
 		}
 	}

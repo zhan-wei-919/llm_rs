@@ -37,6 +37,40 @@ pub mod cuda {
 		);
 	}
 
+	// ---- RoPE ----
+	unsafe extern "C" {
+		pub fn rope_forward_f32(
+			x: *mut f32,
+			cos_table: *const f32,
+			sin_table: *const f32,
+			seq_len: i32,
+			n_heads: i32,
+			HS: i32,
+			pos0: i32,
+			max_seq: i32,
+		);
+		pub fn rope_forward_bf16(
+			x: *mut bf16,
+			cos_table: *const f32,
+			sin_table: *const f32,
+			seq_len: i32,
+			n_heads: i32,
+			HS: i32,
+			pos0: i32,
+			max_seq: i32,
+		);
+		pub fn rope_forward_f16(
+			x: *mut f16,
+			cos_table: *const f32,
+			sin_table: *const f32,
+			seq_len: i32,
+			n_heads: i32,
+			HS: i32,
+			pos0: i32,
+			max_seq: i32,
+		);
+	}
+
 	// ---- LayerNorm ----
 	unsafe extern "C" {
 		pub fn layernorm_forward_f32(
@@ -70,6 +104,37 @@ pub mod cuda {
 			x: *const f16,
 			gamma: *const f16,
 			beta: *const f16,
+			B: i32,
+			seq_len: i32,
+			C: i32,
+			eps: f32,
+		);
+	}
+
+	// ---- RMSNorm ----
+	unsafe extern "C" {
+		pub fn rmsnorm_forward_f32(
+			out: *mut f32,
+			x: *const f32,
+			gamma: *const f32,
+			B: i32,
+			seq_len: i32,
+			C: i32,
+			eps: f32,
+		);
+		pub fn rmsnorm_forward_bf16(
+			out: *mut bf16,
+			x: *const bf16,
+			gamma: *const bf16,
+			B: i32,
+			seq_len: i32,
+			C: i32,
+			eps: f32,
+		);
+		pub fn rmsnorm_forward_f16(
+			out: *mut f16,
+			x: *const f16,
+			gamma: *const f16,
 			B: i32,
 			seq_len: i32,
 			C: i32,
@@ -160,6 +225,31 @@ pub mod cuda {
 		pub fn gelu_forward_f16(y: *mut f16, x: *const f16, N: i32, stream: cudaStream_t);
 	}
 
+	// ---- SiLU Mul (SwiGLU) ----
+	unsafe extern "C" {
+		pub fn silu_mul_forward_f32(
+			out: *mut f32,
+			gate: *const f32,
+			up: *const f32,
+			N: i32,
+			stream: cudaStream_t,
+		);
+		pub fn silu_mul_forward_bf16(
+			out: *mut bf16,
+			gate: *const bf16,
+			up: *const bf16,
+			N: i32,
+			stream: cudaStream_t,
+		);
+		pub fn silu_mul_forward_f16(
+			out: *mut f16,
+			gate: *const f16,
+			up: *const f16,
+			N: i32,
+			stream: cudaStream_t,
+		);
+	}
+
 	// ---- Residual ----
 	unsafe extern "C" {
 		pub fn residual_forward_f32(
@@ -247,6 +337,77 @@ pub mod cuda {
 			cur_len: i32,
 			c: i32,
 			nh: i32,
+		);
+	}
+
+	// --- GQAttention Prefill ---
+	unsafe extern "C" {
+		pub fn gq_attention_prefill_forward_f32(
+			out: *mut f32,
+			q: *const f32,
+			k: *const f32,
+			v: *const f32,
+			b: i32,
+			seq_len: i32,
+			nh: i32,
+			nkv: i32,
+			hs: i32,
+		);
+		pub fn gq_attention_prefill_forward_bf16(
+			out: *mut bf16,
+			q: *const bf16,
+			k: *const bf16,
+			v: *const bf16,
+			b: i32,
+			seq_len: i32,
+			nh: i32,
+			nkv: i32,
+			hs: i32,
+		);
+		pub fn gq_attention_prefill_forward_f16(
+			out: *mut f16,
+			q: *const f16,
+			k: *const f16,
+			v: *const f16,
+			b: i32,
+			seq_len: i32,
+			nh: i32,
+			nkv: i32,
+			hs: i32,
+		);
+	}
+
+	// --- GQAttention Decode ---
+	unsafe extern "C" {
+		pub fn gq_attention_decode_forward_f32(
+			out: *mut f32,
+			q: *const f32,
+			k_cache: *const f32,
+			v_cache: *const f32,
+			cur_len: i32,
+			nh: i32,
+			nkv: i32,
+			hs: i32,
+		);
+		pub fn gq_attention_decode_forward_bf16(
+			out: *mut bf16,
+			q: *const bf16,
+			k_cache: *const bf16,
+			v_cache: *const bf16,
+			cur_len: i32,
+			nh: i32,
+			nkv: i32,
+			hs: i32,
+		);
+		pub fn gq_attention_decode_forward_f16(
+			out: *mut f16,
+			q: *const f16,
+			k_cache: *const f16,
+			v_cache: *const f16,
+			cur_len: i32,
+			nh: i32,
+			nkv: i32,
+			hs: i32,
 		);
 	}
 

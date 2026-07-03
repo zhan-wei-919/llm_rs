@@ -63,3 +63,16 @@ void launch_gq_attention_decode(
 	int block = 256;
 	gq_attention_decode<T><<<grid, block>>>(out, q, k_cache, v_cache, cur_len, NH, NKV, HS);
 }
+
+#define GQ_ATTENTION_DECODE_FORWARD(name, InT)                                     \
+	extern "C" void gq_attention_decode_forward_##name(                        \
+	    InT *out, const InT *q, const InT *k_cache, const InT *v_cache,        \
+	    int cur_len, int nh, int nkv, int hs) {                                \
+		launch_gq_attention_decode(out, q, k_cache, v_cache, cur_len, nh, nkv, hs); \
+	}
+
+GQ_ATTENTION_DECODE_FORWARD(bf16, __nv_bfloat16)
+GQ_ATTENTION_DECODE_FORWARD(f16, half)
+GQ_ATTENTION_DECODE_FORWARD(f32, float)
+
+#undef GQ_ATTENTION_DECODE_FORWARD
