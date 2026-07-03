@@ -1,5 +1,5 @@
-mod tensor;
 pub mod arena;
+mod tensor;
 
-pub use tensor::Tensor;
 pub use arena::Arena;
+pub use tensor::Tensor;
