@@ -8,7 +8,7 @@ __global__ void GELU(T *y, const T *x, int N) {
 		const int VEC = sizeof(float4) / sizeof(T);
 		int base = (blockIdx.x * blockDim.x + threadIdx.x) * VEC;
 		if (base >= N) return;
-		
+
 		if (base + VEC <= N) {
 				float4 in = *reinterpret_cast<const float4*>(&x[base]);
 				T *v = reinterpret_cast<T*>(&in);

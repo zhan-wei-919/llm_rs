@@ -1,0 +1,7 @@
+# C/C++/CUDA 格式化风格：基于 LLVM，仅把缩进改成硬 tab、每级 8 列。
+# 保存时由 clangd 内置的 clang-format 应用（Zed format_on_save）。
+BasedOnStyle: LLVM
+# 缩进用 tab，续行对齐（如函数参数对齐）用空格，保证在任意 tab 宽度下对齐都稳定。
+UseTab: ForIndentation
+IndentWidth: 8
+TabWidth: 8
