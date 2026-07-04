@@ -1,4 +1,5 @@
 #pragma once
+#include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <cuda_bf16.h>
@@ -52,17 +53,16 @@ void launch_crossentropy_forward(
 		cross_entropy<T><<<grid, block>>>(losses, probs, logits, targets, V);
 }
 
-#define CROSSENTROPY_FORWARD(name, InT)                                       \
-extern "C" void crossentropy_forward_##name(                                  \
-		float *losses, InT *probs, const InT *logits,                         \
-		const int *targets, int B, int seq_len, int V                         \
-) {                                                                           \
-		launch_crossentropy_forward(losses, probs, logits, targets,           \
-				B, seq_len, V);                                               \
+// dtype 契约: 0=f32 1=bf16 2=f16,与 backend Dtype::TAG 一致
+// losses 恒为 f32,targets 恒为 int,不参与 dtype 化
+extern "C" void crossentropy_forward(
+		int dtype, float *losses, void *probs, const void *logits,
+		const int *targets, int B, int seq_len, int V
+) {
+	switch (dtype) {
+		case 0: launch_crossentropy_forward(losses, (float *)probs, (const float *)logits, targets, B, seq_len, V); break;
+		case 1: launch_crossentropy_forward(losses, (__nv_bfloat16 *)probs, (const __nv_bfloat16 *)logits, targets, B, seq_len, V); break;
+		case 2: launch_crossentropy_forward(losses, (half *)probs, (const half *)logits, targets, B, seq_len, V); break;
+		default: assert(false && "unknown dtype");
+	}
 }
-
-CROSSENTROPY_FORWARD(bf16, __nv_bfloat16)
-CROSSENTROPY_FORWARD(f16,  half)
-CROSSENTROPY_FORWARD(f32,  float)
-
-#undef CROSSENTROPY_FORWARD

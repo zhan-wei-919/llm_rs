@@ -53,11 +53,10 @@ impl<D: Dtype> GPT2<D> {
 		self.logits.forward(&self.ln_f.output());
 	}
 
-	pub fn load_model(&self, path: &str) -> usize {
-		let hit = self
-			.arena
-			.load_weight(path, |name| name.ends_with(".attn.bias"));
-		assert_eq!(hit, 148);
+	pub fn load_model(&self, path: &str) {
+		// GPT-2 是 Conv1D 布局无需转置,也没有 host 侧 tensor
+		self.arena
+			.load_weight(path, |name| name.ends_with(".attn.bias"), |_| false, |_| false);
 
 		let lg = self.arena.get("lg.weight");
 		let size = VOCAB_PAD * 768 * D::SIZE;
@@ -72,7 +71,6 @@ impl<D: Dtype> GPT2<D> {
 		);
 
 		self.arena.backend.device.synchronize();
-		hit
 	}
 
 	pub fn output(&self) -> Tensor<D> {
@@ -198,7 +196,7 @@ mod tests {
 		let backend = Arc::new(Backend::<F32>::cuda());
 		let arena = Arc::new(Arena::new(backend));
 		let _model = GPT2::new(arena.clone());
-		let hit = _model.load_model("/home/zhanwei/project/llm_rs/weights/model.safetensors");
+		_model.load_model("/home/zhanwei/project/llm_rs/weights/model.safetensors");
 		// 转置定义：lg[k][n] == wte[n][k]。lg 行主序 [768, 50304]，wte 行主序 [50257, 768]。
 		let read_f32 = |name: &str, row: usize, col: usize, row_stride: usize| -> f32 {
 			let mut v = [0f32; 1];
@@ -221,7 +219,6 @@ mod tests {
 		);
 		// pad 区必须是 0（同时验证 memset 和 out_stride 没错位）
 		assert_eq!(read_f32("lg.weight", 0, 50300, VOCAB_PAD), 0.0);
-		assert_eq!(hit, 148);
 	}
 
 	#[test]

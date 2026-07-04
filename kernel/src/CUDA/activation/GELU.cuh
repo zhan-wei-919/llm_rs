@@ -1,4 +1,5 @@
 #pragma once
+#include <cassert>
 #include <cmath>
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
@@ -36,13 +37,12 @@ void launch_GELU_forward(T *y, const T *x, int N, cudaStream_t s = nullptr) {
 		GELU<<<blocks, threads, 0, s>>>(y, x, N);
 }
 
-#define GELU_FORWARD(name, T) \
-extern "C" void gelu_forward_##name(T *y, const T *x, int N, cudaStream_t s) { \
-		launch_GELU_forward(y, x, N, s); \
+// dtype 契约: 0=f32 1=bf16 2=f16,与 backend Dtype::TAG 一致
+extern "C" void gelu_forward(int dtype, void *y, const void *x, int N, cudaStream_t s) {
+	switch (dtype) {
+		case 0: launch_GELU_forward((float *)y, (const float *)x, N, s); break;
+		case 1: launch_GELU_forward((__nv_bfloat16 *)y, (const __nv_bfloat16 *)x, N, s); break;
+		case 2: launch_GELU_forward((half *)y, (const half *)x, N, s); break;
+		default: assert(false && "unknown dtype");
+	}
 }
-
-GELU_FORWARD(bf16, __nv_bfloat16)
-GELU_FORWARD(f16, half)
-GELU_FORWARD(f32, float)
-
-#undef  GELU_FORWARD

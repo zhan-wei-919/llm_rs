@@ -1,4 +1,5 @@
 #pragma once
+#include <cassert>
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
 
@@ -47,17 +48,15 @@ void launch_embedding_forward(
 		add_token_and_pos_embedding<<<grid, block>>>(out, token_ids, token_table, pos_table, B, seq_len, C);
 }
 
-#define EMBEDDING_FORWARD(name, InT)                                      \
-extern "C" void embedding_forward_##name(                                 \
-		InT *out, const int *token_ids, const InT *token_table,           \
-		const InT *pos_table, int B, int seq_len, int C                   \
-) {                                                                       \
-		launch_embedding_forward(out, token_ids, token_table, pos_table,   \
-				B, seq_len, C);                                            \
+// dtype 契约: 0=f32 1=bf16 2=f16,与 backend Dtype::TAG 一致
+extern "C" void embedding_forward(
+		int dtype, void *out, const int *token_ids, const void *token_table,
+		const void *pos_table, int B, int seq_len, int C
+) {
+	switch (dtype) {
+		case 0: launch_embedding_forward((float *)out, token_ids, (const float *)token_table, (const float *)pos_table, B, seq_len, C); break;
+		case 1: launch_embedding_forward((__nv_bfloat16 *)out, token_ids, (const __nv_bfloat16 *)token_table, (const __nv_bfloat16 *)pos_table, B, seq_len, C); break;
+		case 2: launch_embedding_forward((half *)out, token_ids, (const half *)token_table, (const half *)pos_table, B, seq_len, C); break;
+		default: assert(false && "unknown dtype");
+	}
 }
-
-EMBEDDING_FORWARD(bf16, __nv_bfloat16)
-EMBEDDING_FORWARD(f16,  half)
-EMBEDDING_FORWARD(f32,  float)
-
-#undef EMBEDDING_FORWARD

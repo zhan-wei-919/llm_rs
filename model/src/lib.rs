@@ -8,3 +8,6 @@ pub use module::linear::Linear;
 pub use module::lmhead::LmHead;
 pub use module::residual::Residual;
 pub use module::transformer::Transformer;
+pub use module::qwenembedding::QwenEmbedding;
+pub use module::rmsnorm::RMSNorm;
+pub use module::gqattention::GQAttention;

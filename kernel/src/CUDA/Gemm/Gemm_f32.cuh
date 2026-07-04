@@ -154,14 +154,4 @@ void launch_gemm_f32_forward(
 		Gemm_f32<Config><<<grid, Config::T, 0, stream>>>(A, B, C, bias, alpha, beta, M, N, K);
 }
 
-#define GEMM_F32_FORWARD(name)                                                \
-extern "C" void gemm_forward_##name(                                          \
-		const float *A, const float *B, float *C, const float *bias,          \
-		float alpha, float beta, int M, int N, int K, cudaStream_t s          \
-) {                                                                           \
-		launch_gemm_f32_forward(A, B, C, bias, alpha, beta, M, N, K, s);      \
-}
-
-GEMM_F32_FORWARD(f32)
-
-#undef GEMM_F32_FORWARD
+// gemm 的 extern 分发符号统一放在 kernels.cu(见该文件尾部 gemm_forward)

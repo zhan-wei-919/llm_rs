@@ -9,8 +9,7 @@ fn main() {
 	let backend = Arc::new(Backend::cuda());
 	let arena = Arc::new(Arena::new(backend));
 	let gpt = GPT2::new(arena);
-	let hit = gpt.load_model("weights/model.safetensors");
-	println!("loaded {} tensors", hit);
+	gpt.load_model("weights/model.safetensors");
 	let input = "Alan Turing theorized that computers would one day become";
 	let tok = Tokenizer::new("data/merges.txt", "data/vocab.json");
 	let input_ids = tok.encode(input);

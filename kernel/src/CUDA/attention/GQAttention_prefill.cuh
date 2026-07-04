@@ -1,4 +1,5 @@
 #pragma once
+#include <cassert>
 #include "../reduce/Reduce.cuh"
 #define GQA_MAX_SEQ_LEN 4096
 
@@ -69,15 +70,15 @@ void launch_gq_attention_prefill(
 	gq_attention_prefill<T><<<grid, block>>>(out, q, k, v, seq_len, NH, NKV, HS);
 }
 
-#define GQ_ATTENTION_PREFILL_FORWARD(name, InT)                                   \
-	extern "C" void gq_attention_prefill_forward_##name(                      \
-	    InT *out, const InT *q, const InT *k, const InT *v,                    \
-	    int b, int seq_len, int nh, int nkv, int hs) {                         \
-		launch_gq_attention_prefill(out, q, k, v, b, seq_len, nh, nkv, hs); \
+// dtype 契约: 0=f32 1=bf16 2=f16,与 backend Dtype::TAG 一致
+extern "C" void gq_attention_prefill_forward(
+		int dtype, void *out, const void *q, const void *k, const void *v,
+		int b, int seq_len, int nh, int nkv, int hs
+) {
+	switch (dtype) {
+		case 0: launch_gq_attention_prefill((float *)out, (const float *)q, (const float *)k, (const float *)v, b, seq_len, nh, nkv, hs); break;
+		case 1: launch_gq_attention_prefill((__nv_bfloat16 *)out, (const __nv_bfloat16 *)q, (const __nv_bfloat16 *)k, (const __nv_bfloat16 *)v, b, seq_len, nh, nkv, hs); break;
+		case 2: launch_gq_attention_prefill((half *)out, (const half *)q, (const half *)k, (const half *)v, b, seq_len, nh, nkv, hs); break;
+		default: assert(false && "unknown dtype");
 	}
-
-GQ_ATTENTION_PREFILL_FORWARD(bf16, __nv_bfloat16)
-GQ_ATTENTION_PREFILL_FORWARD(f16, half)
-GQ_ATTENTION_PREFILL_FORWARD(f32, float)
-
-#undef GQ_ATTENTION_PREFILL_FORWARD
+}

@@ -37,17 +37,16 @@ void launch_rope(
     rope<T><<<grid, block>>>(x, cos_table, sin_table, n_heads, HS, pos0);
 }
 
-#define ROPE_FORWARD(name, InT)                                            \
-extern "C" void rope_forward_##name(                                       \
-		InT *x, const float *cos_table, const float *sin_table,            \
-		int seq_len, int n_heads, int HS, int pos0, int max_seq            \
-) {                                                                        \
-		launch_rope(x, cos_table, sin_table,                               \
-				seq_len, n_heads, HS, pos0, max_seq);                      \
+// dtype 契约: 0=f32 1=bf16 2=f16,与 backend Dtype::TAG 一致
+// cos/sin 表恒为 f32,不参与 dtype 化
+extern "C" void rope_forward(
+		int dtype, void *x, const float *cos_table, const float *sin_table,
+		int seq_len, int n_heads, int HS, int pos0, int max_seq
+) {
+	switch (dtype) {
+		case 0: launch_rope((float *)x, cos_table, sin_table, seq_len, n_heads, HS, pos0, max_seq); break;
+		case 1: launch_rope((__nv_bfloat16 *)x, cos_table, sin_table, seq_len, n_heads, HS, pos0, max_seq); break;
+		case 2: launch_rope((half *)x, cos_table, sin_table, seq_len, n_heads, HS, pos0, max_seq); break;
+		default: assert(false && "unknown dtype");
+	}
 }
-
-ROPE_FORWARD(bf16, __nv_bfloat16)
-ROPE_FORWARD(f16,  half)
-ROPE_FORWARD(f32,  float)
-
-#undef ROPE_FORWARD

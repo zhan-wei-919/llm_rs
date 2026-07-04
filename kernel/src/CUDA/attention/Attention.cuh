@@ -1,4 +1,5 @@
 #pragma once
+#include <cassert>
 #include "../reduce/Reduce.cuh"
 #include <cmath>
 #include <cstddef>
@@ -71,15 +72,15 @@ void launch_attention_forward(T *__restrict__ out,       // [B, T, C]
 	attention<T><<<grid, block>>>(out, att, qkv, B, seq_len, C, NH);
 }
 
-#define ATTENTION_FORWARD(name, InT)                                           \
-	extern "C" void attention_forward_##name(InT *out, InT *att,           \
-	                                         const InT *qkv, int B,        \
-	                                         int seq_len, int C, int NH) { \
-		launch_attention_forward(out, att, qkv, B, seq_len, C, NH);    \
+// dtype 契约: 0=f32 1=bf16 2=f16,与 backend Dtype::TAG 一致
+extern "C" void attention_forward(
+		int dtype, void *out, void *att, const void *qkv,
+		int B, int seq_len, int C, int NH
+) {
+	switch (dtype) {
+		case 0: launch_attention_forward((float *)out, (float *)att, (const float *)qkv, B, seq_len, C, NH); break;
+		case 1: launch_attention_forward((__nv_bfloat16 *)out, (__nv_bfloat16 *)att, (const __nv_bfloat16 *)qkv, B, seq_len, C, NH); break;
+		case 2: launch_attention_forward((half *)out, (half *)att, (const half *)qkv, B, seq_len, C, NH); break;
+		default: assert(false && "unknown dtype");
 	}
-
-ATTENTION_FORWARD(bf16, __nv_bfloat16)
-ATTENTION_FORWARD(f16, half)
-ATTENTION_FORWARD(f32, float)
-
-#undef ATTENTION_FORWARD
+}

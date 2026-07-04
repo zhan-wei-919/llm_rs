@@ -1,4 +1,5 @@
 #pragma once
+#include <cassert>
 #include "../reduce/Reduce.cuh"
 #include <cmath>
 #include <cstddef>
@@ -65,16 +66,15 @@ void launch_attention_decode_forward(
 	attention_decode<T><<<grid, block>>>(out, qkv, k_cache, v_cache, cur_len, C, NH);
 }
 
-#define ATTENTION_DECODE_FORWARD(name, InT)                                    \
-	extern "C" void attention_decode_forward_##name(                       \
-	    InT *out, const InT *qkv, const InT *k_cache, const InT *v_cache,  \
-	    int cur_len, int C, int NH) {                                      \
-		launch_attention_decode_forward(out, qkv, k_cache, v_cache,    \
-		                                cur_len, C, NH);               \
+// dtype 契约: 0=f32 1=bf16 2=f16,与 backend Dtype::TAG 一致
+extern "C" void attention_decode_forward(
+		int dtype, void *out, const void *qkv, const void *k_cache, const void *v_cache,
+		int cur_len, int C, int NH
+) {
+	switch (dtype) {
+		case 0: launch_attention_decode_forward((float *)out, (const float *)qkv, (const float *)k_cache, (const float *)v_cache, cur_len, C, NH); break;
+		case 1: launch_attention_decode_forward((__nv_bfloat16 *)out, (const __nv_bfloat16 *)qkv, (const __nv_bfloat16 *)k_cache, (const __nv_bfloat16 *)v_cache, cur_len, C, NH); break;
+		case 2: launch_attention_decode_forward((half *)out, (const half *)qkv, (const half *)k_cache, (const half *)v_cache, cur_len, C, NH); break;
+		default: assert(false && "unknown dtype");
 	}
-
-ATTENTION_DECODE_FORWARD(bf16, __nv_bfloat16)
-ATTENTION_DECODE_FORWARD(f16, half)
-ATTENTION_DECODE_FORWARD(f32, float)
-
-#undef ATTENTION_DECODE_FORWARD
+}

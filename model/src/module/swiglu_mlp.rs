@@ -16,7 +16,7 @@ pub struct SwiGLU_MLP<D: Dtype> {
 impl<D: Dtype> SwiGLU_MLP<D> {
 	pub fn new(
 		arena: Arc<Arena<D>>,
-		prefix: String,
+		prefix: &str,
 		hidden_dim: usize,
 		proj_dim: usize,
 		t_max: usize,

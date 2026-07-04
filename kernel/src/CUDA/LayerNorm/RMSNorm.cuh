@@ -1,4 +1,5 @@
 #pragma once
+#include <cassert>
 #include "../reduce/Reduce.cuh"
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
@@ -61,15 +62,15 @@ void launch_RMSNorm_forward(T *__restrict__ out,         // [B, T, C]
 	rmsnorm<<<grid, block>>>(out, x, gamma, C, eps);
 }
 
-#define RMSNORM_FORWARD(name, InT)                                             \
-	extern "C" void rmsnorm_forward_##name(                                \
-	    InT *out, const InT *x, const InT *gamma, int B, int seq_len,      \
-	    int C, float eps) {                                                \
-		launch_RMSNorm_forward(out, x, gamma, B, seq_len, C, eps);     \
+// dtype 契约: 0=f32 1=bf16 2=f16,与 backend Dtype::TAG 一致
+extern "C" void rmsnorm_forward(
+		int dtype, void *out, const void *x, const void *gamma,
+		int B, int seq_len, int C, float eps
+) {
+	switch (dtype) {
+		case 0: launch_RMSNorm_forward((float *)out, (const float *)x, (const float *)gamma, B, seq_len, C, eps); break;
+		case 1: launch_RMSNorm_forward((__nv_bfloat16 *)out, (const __nv_bfloat16 *)x, (const __nv_bfloat16 *)gamma, B, seq_len, C, eps); break;
+		case 2: launch_RMSNorm_forward((half *)out, (const half *)x, (const half *)gamma, B, seq_len, C, eps); break;
+		default: assert(false && "unknown dtype");
 	}
-
-RMSNORM_FORWARD(bf16, __nv_bfloat16)
-RMSNORM_FORWARD(f16, half)
-RMSNORM_FORWARD(f32, float)
-
-#undef RMSNORM_FORWARD
+}

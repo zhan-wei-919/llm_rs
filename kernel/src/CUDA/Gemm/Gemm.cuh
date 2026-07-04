@@ -273,19 +273,5 @@ void launch_Gemm_forward(
 		}
 }
 
-#define GEMM_FORWARD(name, InT, OutT)                                         \
-extern "C" void gemm_forward_##name(                                          \
-		const InT *A, const InT *B, OutT *C, const OutT *bias,               \
-		float alpha, float beta, int M, int N, int K, cudaStream_t s          \
-) {                                                                           \
-		launch_Gemm_forward<GemmConfig<InT, OutT>>(                           \
-				A, B, C, bias, alpha, beta, M, N, K, s);                      \
-}
-
-GEMM_FORWARD(bf16,      __nv_bfloat16, __nv_bfloat16)
-GEMM_FORWARD(bf16_f32,  __nv_bfloat16, float)
-GEMM_FORWARD(f16,       half,          half)
-GEMM_FORWARD(f16_f32,   half,          float)
-GEMM_FORWARD(i8_i32,    signed char,   int)
-
-#undef GEMM_FORWARD
+// gemm 的 extern 分发符号统一放在 kernels.cu:
+// 需要同时看到 f32 独立 launcher 与本文件的 tensor-core launcher,单个 TU 才凑得齐

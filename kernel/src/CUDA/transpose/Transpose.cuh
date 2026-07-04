@@ -1,4 +1,5 @@
 #pragma once
+#include <cassert>
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
 
@@ -32,14 +33,12 @@ void launch_transpose_forward(T *out, const T *in, int R, int C,
   transpose<<<grid, block>>>(out, in, R, C, out_stride);
 }
 
-#define TRANSPOSE_FORWARD(name, InT)                                           \
-  extern "C" void transpose_forward_##name(InT *out, const InT *in, int R,     \
-                                           int C, int out_stride) {            \
-    launch_transpose_forward(out, in, R, C, out_stride);                       \
-  }
-
-TRANSPOSE_FORWARD(bf16, __nv_bfloat16)
-TRANSPOSE_FORWARD(f16, half)
-TRANSPOSE_FORWARD(f32, float)
-
-#undef TRANSPOSE_FORWARD
+// dtype 契约: 0=f32 1=bf16 2=f16,与 backend Dtype::TAG 一致
+extern "C" void transpose_forward(int dtype, void *out, const void *in, int R, int C, int out_stride) {
+	switch (dtype) {
+		case 0: launch_transpose_forward((float *)out, (const float *)in, R, C, out_stride); break;
+		case 1: launch_transpose_forward((__nv_bfloat16 *)out, (const __nv_bfloat16 *)in, R, C, out_stride); break;
+		case 2: launch_transpose_forward((half *)out, (const half *)in, R, C, out_stride); break;
+		default: assert(false && "unknown dtype");
+	}
+}

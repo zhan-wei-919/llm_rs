@@ -10,10 +10,10 @@ pub struct RMSNorm<D: Dtype> {
 }
 
 impl<D: Dtype> RMSNorm<D> {
-	pub fn new(arena: Arc<Arena<D>>, prefix: String, t_max: usize, hidden_dim: usize, eps: f32) -> Self{
+	pub fn new(arena: Arc<Arena<D>>, prefix: &str, t_max: usize, hidden_dim: usize, eps: f32) -> Self{
 		arena.alloc(format!("{prefix}.weight"), vec![hidden_dim]);
 		arena.alloc(format!("{prefix}.output"), vec![1, t_max, hidden_dim]);
-		RMSNorm { arena, prefix, eps }
+		RMSNorm { arena, prefix: prefix.to_string(), eps }
 	}
 
 	pub fn forward(&self, x: &Tensor<D>) {

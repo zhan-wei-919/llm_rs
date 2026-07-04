@@ -22,7 +22,7 @@ impl<D: Dtype> GQAttention<D> {
 	pub fn new(
 		arena: Arc<Arena<D>>,
 		rope: Arc<Rope<D>>,
-		prefix: String,
+		prefix: &str,
 		nh: usize,
 		nkv: usize,
 		hs: usize,
@@ -37,7 +37,7 @@ impl<D: Dtype> GQAttention<D> {
 		let k_proj = Linear::new(arena.clone(), &format!("{prefix}.k_proj"), hidden_size, nkv * hs, b, t_max, true);
 		let v_proj = Linear::new(arena.clone(), &format!("{prefix}.v_proj"), hidden_size, nkv * hs, b, t_max, true);
 		let o_proj = Linear::new(arena.clone(), &format!("{prefix}.o_proj"), nh * hs, hidden_size, b, t_max, false);
-		GQAttention { arena, prefix, q_proj, k_proj, v_proj, o_proj, rope, nh, nkv, hs, t_max }
+		GQAttention { arena, prefix: prefix.to_string(), q_proj, k_proj, v_proj, o_proj, rope, nh, nkv, hs, t_max }
 	}
 
 	pub fn k_cache_rows(&self, start: usize, len: usize) -> Tensor<D> {

@@ -1,4 +1,5 @@
 #pragma once
+#include <cassert>
 #include <cmath>
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
@@ -48,11 +49,12 @@ void launch_silu_mul(T *out, const T *gate, const T *up, int N, cudaStream_t s =
     silu_mul<<<blocks, threads, 0, s>>>(out, gate, up, N);
 }
 
-#define SILU_MUL_FORWARD(name, T) \
-extern "C" void silu_mul_forward_##name(T *out, const T *gate, const T *up, int N, cudaStream_t s) { \
-    launch_silu_mul(out, gate, up, N, s); \
+// dtype 契约: 0=f32 1=bf16 2=f16,与 backend Dtype::TAG 一致
+extern "C" void silu_mul_forward(int dtype, void *out, const void *gate, const void *up, int N, cudaStream_t s) {
+	switch (dtype) {
+		case 0: launch_silu_mul((float *)out, (const float *)gate, (const float *)up, N, s); break;
+		case 1: launch_silu_mul((__nv_bfloat16 *)out, (const __nv_bfloat16 *)gate, (const __nv_bfloat16 *)up, N, s); break;
+		case 2: launch_silu_mul((half *)out, (const half *)gate, (const half *)up, N, s); break;
+		default: assert(false && "unknown dtype");
+	}
 }
-SILU_MUL_FORWARD(bf16, __nv_bfloat16)
-SILU_MUL_FORWARD(f16, half)
-SILU_MUL_FORWARD(f32, float)
-#undef SILU_MUL_FORWARD

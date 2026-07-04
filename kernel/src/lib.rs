@@ -3,34 +3,19 @@
 pub mod cuda {
 	pub type cudaStream_t = *mut std::ffi::c_void;
 
-	type bf16 = u16;
-	type f16 = u16;
+	// 每个 op 只导出一个符号,首参 dtype 在 C++ 侧 switch 分发。
+	// dtype 契约: F32=0 BF16=1 F16=2,与 backend Dtype::TAG 一致。
+	// 参与 dtype 化的数据指针统一声明为 *mut u8 / *const u8,Rust 侧无需任何 cast;
+	// 恒为 f32 / i32 的表(cos/sin、mean/rstd、losses、token_ids、targets)保持原类型。
 
 	// ---- Embedding ----
 	unsafe extern "C" {
-		pub fn embedding_forward_f32(
-			out: *mut f32,
+		pub fn embedding_forward(
+			dtype: i32,
+			out: *mut u8,
 			token_ids: *const i32,
-			token_table: *const f32,
-			pos_table: *const f32,
-			B: i32,
-			seq_len: i32,
-			C: i32,
-		);
-		pub fn embedding_forward_bf16(
-			out: *mut bf16,
-			token_ids: *const i32,
-			token_table: *const bf16,
-			pos_table: *const bf16,
-			B: i32,
-			seq_len: i32,
-			C: i32,
-		);
-		pub fn embedding_forward_f16(
-			out: *mut f16,
-			token_ids: *const i32,
-			token_table: *const f16,
-			pos_table: *const f16,
+			token_table: *const u8,
+			pos_table: *const u8,
 			B: i32,
 			seq_len: i32,
 			C: i32,
@@ -39,28 +24,9 @@ pub mod cuda {
 
 	// ---- RoPE ----
 	unsafe extern "C" {
-		pub fn rope_forward_f32(
-			x: *mut f32,
-			cos_table: *const f32,
-			sin_table: *const f32,
-			seq_len: i32,
-			n_heads: i32,
-			HS: i32,
-			pos0: i32,
-			max_seq: i32,
-		);
-		pub fn rope_forward_bf16(
-			x: *mut bf16,
-			cos_table: *const f32,
-			sin_table: *const f32,
-			seq_len: i32,
-			n_heads: i32,
-			HS: i32,
-			pos0: i32,
-			max_seq: i32,
-		);
-		pub fn rope_forward_f16(
-			x: *mut f16,
+		pub fn rope_forward(
+			dtype: i32,
+			x: *mut u8,
 			cos_table: *const f32,
 			sin_table: *const f32,
 			seq_len: i32,
@@ -73,37 +39,14 @@ pub mod cuda {
 
 	// ---- LayerNorm ----
 	unsafe extern "C" {
-		pub fn layernorm_forward_f32(
-			out: *mut f32,
+		pub fn layernorm_forward(
+			dtype: i32,
+			out: *mut u8,
 			mean_out: *mut f32,
 			rstd_out: *mut f32,
-			x: *const f32,
-			gamma: *const f32,
-			beta: *const f32,
-			B: i32,
-			seq_len: i32,
-			C: i32,
-			eps: f32,
-		);
-		pub fn layernorm_forward_bf16(
-			out: *mut bf16,
-			mean_out: *mut f32,
-			rstd_out: *mut f32,
-			x: *const bf16,
-			gamma: *const bf16,
-			beta: *const bf16,
-			B: i32,
-			seq_len: i32,
-			C: i32,
-			eps: f32,
-		);
-		pub fn layernorm_forward_f16(
-			out: *mut f16,
-			mean_out: *mut f32,
-			rstd_out: *mut f32,
-			x: *const f16,
-			gamma: *const f16,
-			beta: *const f16,
+			x: *const u8,
+			gamma: *const u8,
+			beta: *const u8,
 			B: i32,
 			seq_len: i32,
 			C: i32,
@@ -113,28 +56,11 @@ pub mod cuda {
 
 	// ---- RMSNorm ----
 	unsafe extern "C" {
-		pub fn rmsnorm_forward_f32(
-			out: *mut f32,
-			x: *const f32,
-			gamma: *const f32,
-			B: i32,
-			seq_len: i32,
-			C: i32,
-			eps: f32,
-		);
-		pub fn rmsnorm_forward_bf16(
-			out: *mut bf16,
-			x: *const bf16,
-			gamma: *const bf16,
-			B: i32,
-			seq_len: i32,
-			C: i32,
-			eps: f32,
-		);
-		pub fn rmsnorm_forward_f16(
-			out: *mut f16,
-			x: *const f16,
-			gamma: *const f16,
+		pub fn rmsnorm_forward(
+			dtype: i32,
+			out: *mut u8,
+			x: *const u8,
+			gamma: *const u8,
 			B: i32,
 			seq_len: i32,
 			C: i32,
@@ -144,71 +70,12 @@ pub mod cuda {
 
 	// ---- Gemm ----
 	unsafe extern "C" {
-		pub fn gemm_forward_f32(
-			A: *const f32,
-			B: *const f32,
-			C: *mut f32,
-			bias: *const f32,
-			alpha: f32,
-			beta: f32,
-			M: i32,
-			N: i32,
-			K: i32,
-			stream: cudaStream_t,
-		);
-		pub fn gemm_forward_bf16(
-			A: *const bf16,
-			B: *const bf16,
-			C: *mut bf16,
-			bias: *const bf16,
-			alpha: f32,
-			beta: f32,
-			M: i32,
-			N: i32,
-			K: i32,
-			stream: cudaStream_t,
-		);
-		pub fn gemm_forward_bf16_f32(
-			A: *const bf16,
-			B: *const bf16,
-			C: *mut f32,
-			bias: *const f32,
-			alpha: f32,
-			beta: f32,
-			M: i32,
-			N: i32,
-			K: i32,
-			stream: cudaStream_t,
-		);
-		pub fn gemm_forward_f16(
-			A: *const f16,
-			B: *const f16,
-			C: *mut f16,
-			bias: *const f16,
-			alpha: f32,
-			beta: f32,
-			M: i32,
-			N: i32,
-			K: i32,
-			stream: cudaStream_t,
-		);
-		pub fn gemm_forward_f16_f32(
-			A: *const f16,
-			B: *const f16,
-			C: *mut f32,
-			bias: *const f32,
-			alpha: f32,
-			beta: f32,
-			M: i32,
-			N: i32,
-			K: i32,
-			stream: cudaStream_t,
-		);
-		pub fn gemm_forward_i8_i32(
-			A: *const i8,
-			B: *const i8,
-			C: *mut i32,
-			bias: *const i32,
+		pub fn gemm_forward(
+			dtype: i32,
+			A: *const u8,
+			B: *const u8,
+			C: *mut u8,
+			bias: *const u8,
 			alpha: f32,
 			beta: f32,
 			M: i32,
@@ -220,31 +87,16 @@ pub mod cuda {
 
 	// ---- GELU ----
 	unsafe extern "C" {
-		pub fn gelu_forward_f32(y: *mut f32, x: *const f32, N: i32, stream: cudaStream_t);
-		pub fn gelu_forward_bf16(y: *mut bf16, x: *const bf16, N: i32, stream: cudaStream_t);
-		pub fn gelu_forward_f16(y: *mut f16, x: *const f16, N: i32, stream: cudaStream_t);
+		pub fn gelu_forward(dtype: i32, y: *mut u8, x: *const u8, N: i32, stream: cudaStream_t);
 	}
 
 	// ---- SiLU Mul (SwiGLU) ----
 	unsafe extern "C" {
-		pub fn silu_mul_forward_f32(
-			out: *mut f32,
-			gate: *const f32,
-			up: *const f32,
-			N: i32,
-			stream: cudaStream_t,
-		);
-		pub fn silu_mul_forward_bf16(
-			out: *mut bf16,
-			gate: *const bf16,
-			up: *const bf16,
-			N: i32,
-			stream: cudaStream_t,
-		);
-		pub fn silu_mul_forward_f16(
-			out: *mut f16,
-			gate: *const f16,
-			up: *const f16,
+		pub fn silu_mul_forward(
+			dtype: i32,
+			out: *mut u8,
+			gate: *const u8,
+			up: *const u8,
 			N: i32,
 			stream: cudaStream_t,
 		);
@@ -252,26 +104,11 @@ pub mod cuda {
 
 	// ---- Residual ----
 	unsafe extern "C" {
-		pub fn residual_forward_f32(
-			out: *mut f32,
-			a: *const f32,
-			b: *const f32,
-			B: i32,
-			seq_len: i32,
-			C: i32,
-		);
-		pub fn residual_forward_bf16(
-			out: *mut bf16,
-			a: *const bf16,
-			b: *const bf16,
-			B: i32,
-			seq_len: i32,
-			C: i32,
-		);
-		pub fn residual_forward_f16(
-			out: *mut f16,
-			a: *const f16,
-			b: *const f16,
+		pub fn residual_forward(
+			dtype: i32,
+			out: *mut u8,
+			a: *const u8,
+			b: *const u8,
 			B: i32,
 			seq_len: i32,
 			C: i32,
@@ -280,28 +117,11 @@ pub mod cuda {
 
 	// ---- Attention ----
 	unsafe extern "C" {
-		pub fn attention_forward_f32(
-			out: *mut f32,
-			att: *mut f32,
-			qkv: *const f32,
-			B: i32,
-			seq_len: i32,
-			C: i32,
-			NH: i32,
-		);
-		pub fn attention_forward_bf16(
-			out: *mut bf16,
-			att: *mut bf16,
-			qkv: *const bf16,
-			B: i32,
-			seq_len: i32,
-			C: i32,
-			NH: i32,
-		);
-		pub fn attention_forward_f16(
-			out: *mut f16,
-			att: *mut f16,
-			qkv: *const f16,
+		pub fn attention_forward(
+			dtype: i32,
+			out: *mut u8,
+			att: *mut u8,
+			qkv: *const u8,
 			B: i32,
 			seq_len: i32,
 			C: i32,
@@ -311,29 +131,12 @@ pub mod cuda {
 
 	// --- Attention Decode ---
 	unsafe extern "C" {
-		pub fn attention_decode_forward_f32(
-			out: *mut f32,
-			qkv: *const f32,
-			k_cache: *const f32,
-			v_cache: *const f32,
-			cur_len: i32,
-			c: i32,
-			nh: i32,
-		);
-		pub fn attention_decode_forward_bf16(
-			out: *mut bf16,
-			qkv: *const bf16,
-			k_cache: *const bf16,
-			v_cache: *const bf16,
-			cur_len: i32,
-			c: i32,
-			nh: i32,
-		);
-		pub fn attention_decode_forward_f16(
-			out: *mut f16,
-			qkv: *const f16,
-			k_cache: *const f16,
-			v_cache: *const f16,
+		pub fn attention_decode_forward(
+			dtype: i32,
+			out: *mut u8,
+			qkv: *const u8,
+			k_cache: *const u8,
+			v_cache: *const u8,
 			cur_len: i32,
 			c: i32,
 			nh: i32,
@@ -342,33 +145,12 @@ pub mod cuda {
 
 	// --- GQAttention Prefill ---
 	unsafe extern "C" {
-		pub fn gq_attention_prefill_forward_f32(
-			out: *mut f32,
-			q: *const f32,
-			k: *const f32,
-			v: *const f32,
-			b: i32,
-			seq_len: i32,
-			nh: i32,
-			nkv: i32,
-			hs: i32,
-		);
-		pub fn gq_attention_prefill_forward_bf16(
-			out: *mut bf16,
-			q: *const bf16,
-			k: *const bf16,
-			v: *const bf16,
-			b: i32,
-			seq_len: i32,
-			nh: i32,
-			nkv: i32,
-			hs: i32,
-		);
-		pub fn gq_attention_prefill_forward_f16(
-			out: *mut f16,
-			q: *const f16,
-			k: *const f16,
-			v: *const f16,
+		pub fn gq_attention_prefill_forward(
+			dtype: i32,
+			out: *mut u8,
+			q: *const u8,
+			k: *const u8,
+			v: *const u8,
 			b: i32,
 			seq_len: i32,
 			nh: i32,
@@ -379,31 +161,12 @@ pub mod cuda {
 
 	// --- GQAttention Decode ---
 	unsafe extern "C" {
-		pub fn gq_attention_decode_forward_f32(
-			out: *mut f32,
-			q: *const f32,
-			k_cache: *const f32,
-			v_cache: *const f32,
-			cur_len: i32,
-			nh: i32,
-			nkv: i32,
-			hs: i32,
-		);
-		pub fn gq_attention_decode_forward_bf16(
-			out: *mut bf16,
-			q: *const bf16,
-			k_cache: *const bf16,
-			v_cache: *const bf16,
-			cur_len: i32,
-			nh: i32,
-			nkv: i32,
-			hs: i32,
-		);
-		pub fn gq_attention_decode_forward_f16(
-			out: *mut f16,
-			q: *const f16,
-			k_cache: *const f16,
-			v_cache: *const f16,
+		pub fn gq_attention_decode_forward(
+			dtype: i32,
+			out: *mut u8,
+			q: *const u8,
+			k_cache: *const u8,
+			v_cache: *const u8,
 			cur_len: i32,
 			nh: i32,
 			nkv: i32,
@@ -413,28 +176,11 @@ pub mod cuda {
 
 	// ---- CrossEntropy ----
 	unsafe extern "C" {
-		pub fn crossentropy_forward_f32(
+		pub fn crossentropy_forward(
+			dtype: i32,
 			losses: *mut f32,
-			probs: *mut f32,
-			logits: *const f32,
-			targets: *const i32,
-			B: i32,
-			seq_len: i32,
-			V: i32,
-		);
-		pub fn crossentropy_forward_bf16(
-			losses: *mut f32,
-			probs: *mut bf16,
-			logits: *const bf16,
-			targets: *const i32,
-			B: i32,
-			seq_len: i32,
-			V: i32,
-		);
-		pub fn crossentropy_forward_f16(
-			losses: *mut f32,
-			probs: *mut f16,
-			logits: *const f16,
+			probs: *mut u8,
+			logits: *const u8,
 			targets: *const i32,
 			B: i32,
 			seq_len: i32,
@@ -444,23 +190,10 @@ pub mod cuda {
 
 	// --- transpose ---
 	unsafe extern "C" {
-		pub fn transpose_forward_f32(
-			out: *mut f32,
-			input: *const f32,
-			R: i32,
-			C: i32,
-			out_stride: i32,
-		);
-		pub fn transpose_forward_bf16(
-			out: *mut bf16,
-			input: *const bf16,
-			R: i32,
-			C: i32,
-			out_stride: i32,
-		);
-		pub fn transpose_forward_f16(
-			out: *mut f16,
-			input: *const f16,
+		pub fn transpose_forward(
+			dtype: i32,
+			out: *mut u8,
+			input: *const u8,
 			R: i32,
 			C: i32,
 			out_stride: i32,
@@ -469,26 +202,11 @@ pub mod cuda {
 
 	// --- gather_kv ---
 	unsafe extern "C" {
-		pub fn gather_kv_forward_f32(
-			k_cache: *mut f32,
-			v_cache: *mut f32,
-			qkv: *const f32,
-			t: i32,
-			c: i32,
-			dst_start: i32,
-		);
-		pub fn gather_kv_forward_bf16(
-			k_cache: *mut bf16,
-			v_cache: *mut bf16,
-			qkv: *const bf16,
-			t: i32,
-			c: i32,
-			dst_start: i32,
-		);
-		pub fn gather_kv_forward_f16(
-			k_cache: *mut f16,
-			v_cache: *mut f16,
-			qkv: *const f16,
+		pub fn gather_kv_forward(
+			dtype: i32,
+			k_cache: *mut u8,
+			v_cache: *mut u8,
+			qkv: *const u8,
 			t: i32,
 			c: i32,
 			dst_start: i32,

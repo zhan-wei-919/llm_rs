@@ -1,4 +1,5 @@
 #pragma once
+#include <cassert>
 #include "../reduce/Reduce.cuh"
 #define GQA_MAX_SEQ_LEN 4096
 
@@ -64,15 +65,15 @@ void launch_gq_attention_decode(
 	gq_attention_decode<T><<<grid, block>>>(out, q, k_cache, v_cache, cur_len, NH, NKV, HS);
 }
 
-#define GQ_ATTENTION_DECODE_FORWARD(name, InT)                                     \
-	extern "C" void gq_attention_decode_forward_##name(                        \
-	    InT *out, const InT *q, const InT *k_cache, const InT *v_cache,        \
-	    int cur_len, int nh, int nkv, int hs) {                                \
-		launch_gq_attention_decode(out, q, k_cache, v_cache, cur_len, nh, nkv, hs); \
+// dtype 契约: 0=f32 1=bf16 2=f16,与 backend Dtype::TAG 一致
+extern "C" void gq_attention_decode_forward(
+		int dtype, void *out, const void *q, const void *k_cache, const void *v_cache,
+		int cur_len, int nh, int nkv, int hs
+) {
+	switch (dtype) {
+		case 0: launch_gq_attention_decode((float *)out, (const float *)q, (const float *)k_cache, (const float *)v_cache, cur_len, nh, nkv, hs); break;
+		case 1: launch_gq_attention_decode((__nv_bfloat16 *)out, (const __nv_bfloat16 *)q, (const __nv_bfloat16 *)k_cache, (const __nv_bfloat16 *)v_cache, cur_len, nh, nkv, hs); break;
+		case 2: launch_gq_attention_decode((half *)out, (const half *)q, (const half *)k_cache, (const half *)v_cache, cur_len, nh, nkv, hs); break;
+		default: assert(false && "unknown dtype");
 	}
-
-GQ_ATTENTION_DECODE_FORWARD(bf16, __nv_bfloat16)
-GQ_ATTENTION_DECODE_FORWARD(f16, half)
-GQ_ATTENTION_DECODE_FORWARD(f32, float)
-
-#undef GQ_ATTENTION_DECODE_FORWARD
+}

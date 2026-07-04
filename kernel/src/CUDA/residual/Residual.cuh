@@ -1,4 +1,5 @@
 #pragma once
+#include <cassert>
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
 
@@ -31,16 +32,15 @@ void launch_residual_forward(T *out, const T *a, const T *b, int B, int seq_len,
 		residual<<<grid, block>>>(out, a, b, C);
 }
 
-#define RESIDUAL_FORWARD(name, InT)                                           \
-extern "C" void residual_forward_##name(                                      \
-		InT *out, const InT *a, const InT *b,                                \
-		int B, int seq_len, int C                                             \
-) {                                                                           \
-		launch_residual_forward(out, a, b, B, seq_len, C);                    \
+// dtype 契约: 0=f32 1=bf16 2=f16,与 backend Dtype::TAG 一致
+extern "C" void residual_forward(
+		int dtype, void *out, const void *a, const void *b,
+		int B, int seq_len, int C
+) {
+	switch (dtype) {
+		case 0: launch_residual_forward((float *)out, (const float *)a, (const float *)b, B, seq_len, C); break;
+		case 1: launch_residual_forward((__nv_bfloat16 *)out, (const __nv_bfloat16 *)a, (const __nv_bfloat16 *)b, B, seq_len, C); break;
+		case 2: launch_residual_forward((half *)out, (const half *)a, (const half *)b, B, seq_len, C); break;
+		default: assert(false && "unknown dtype");
+	}
 }
-
-RESIDUAL_FORWARD(bf16, __nv_bfloat16)
-RESIDUAL_FORWARD(f16,  half)
-RESIDUAL_FORWARD(f32,  float)
-
-#undef RESIDUAL_FORWARD

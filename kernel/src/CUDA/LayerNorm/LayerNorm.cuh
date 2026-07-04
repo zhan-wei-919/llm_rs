@@ -1,4 +1,5 @@
 #pragma once
+#include <cassert>
 #include "../reduce/Reduce.cuh"
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
@@ -85,17 +86,16 @@ void launch_LayerNorm_forward(T *__restrict__ out,          // [B, T, C]
 	                           eps);
 }
 
-#define LAYERNORM_FORWARD(name, InT)                                           \
-	extern "C" void layernorm_forward_##name(                              \
-	    InT *out, float *mean_out, float *rstd_out, const InT *x,          \
-	    const InT *gamma, const InT *beta, int B, int seq_len, int C,      \
-	    float eps) {                                                       \
-		launch_LayerNorm_forward(out, mean_out, rstd_out, x, gamma,    \
-		                         beta, B, seq_len, C, eps);            \
+// dtype 契约: 0=f32 1=bf16 2=f16,与 backend Dtype::TAG 一致
+// mean_out/rstd_out 恒为 f32,不参与 dtype 化
+extern "C" void layernorm_forward(
+		int dtype, void *out, float *mean_out, float *rstd_out, const void *x,
+		const void *gamma, const void *beta, int B, int seq_len, int C, float eps
+) {
+	switch (dtype) {
+		case 0: launch_LayerNorm_forward((float *)out, mean_out, rstd_out, (const float *)x, (const float *)gamma, (const float *)beta, B, seq_len, C, eps); break;
+		case 1: launch_LayerNorm_forward((__nv_bfloat16 *)out, mean_out, rstd_out, (const __nv_bfloat16 *)x, (const __nv_bfloat16 *)gamma, (const __nv_bfloat16 *)beta, B, seq_len, C, eps); break;
+		case 2: launch_LayerNorm_forward((half *)out, mean_out, rstd_out, (const half *)x, (const half *)gamma, (const half *)beta, B, seq_len, C, eps); break;
+		default: assert(false && "unknown dtype");
 	}
-
-LAYERNORM_FORWARD(bf16, __nv_bfloat16)
-LAYERNORM_FORWARD(f16, half)
-LAYERNORM_FORWARD(f32, float)
-
-#undef LAYERNORM_FORWARD
+}
