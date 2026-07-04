@@ -6,3 +6,6 @@ pub mod linear;
 pub mod lmhead;
 pub mod residual;
 pub mod transformer;
+pub mod gqattention;
+pub mod rope;
+pub mod swiglu_mlp;

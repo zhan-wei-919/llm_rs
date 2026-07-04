@@ -37,12 +37,13 @@ impl<D: Dtype> Transformer<D> {
 			3 * c,
 			b,
 			t,
+			true,
 		);
 		let attn = Attention::new(arena.clone(), &format!("{prefix}.attn"), b, t, c, nh);
-		let attn_proj = Linear::new(arena.clone(), &format!("{prefix}.attn.c_proj"), c, c, b, t);
+		let attn_proj = Linear::new(arena.clone(), &format!("{prefix}.attn.c_proj"), c, c, b, t, true);
 		let r1 = Residual::new(arena.clone(), &format!("{prefix}.r1"), b, t, c);
 		let ln2 = LayerNorm::new(arena.clone(), &format!("{prefix}.ln_2"), b, t, c);
-		let fc = Linear::new(arena.clone(), &format!("{prefix}.mlp.c_fc"), c, 4 * c, b, t);
+		let fc = Linear::new(arena.clone(), &format!("{prefix}.mlp.c_fc"), c, 4 * c, b, t, true);
 		let gelu = Gelu::new(arena.clone(), &format!("{prefix}.gelu"), b, t, 4 * c);
 		let fc_proj = Linear::new(
 			arena.clone(),
@@ -51,6 +52,7 @@ impl<D: Dtype> Transformer<D> {
 			c,
 			b,
 			t,
+			true,
 		);
 		let r2 = Residual::new(arena.clone(), &format!("{prefix}.r2"), b, t, c);
 		Transformer {

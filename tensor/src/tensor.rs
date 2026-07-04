@@ -35,4 +35,12 @@ impl<D: Dtype> Tensor<D> {
 		debug_assert!(shape.iter().product::<usize>() <= self.numel());
 		Tensor::new(self.ptr, shape)
 	}
+
+	pub fn slice_rows(&self, start: usize, len: usize) -> Tensor<D> {
+		debug_assert_eq!(self.shape().len(), 2);
+		debug_assert!(start + len <= self.shape()[0]);
+		let width = self.shape()[1];
+		let ptr = unsafe {self.ptr.add(start * width * D::SIZE)};
+		Tensor::new(ptr, vec![len, width])
+	}
 }

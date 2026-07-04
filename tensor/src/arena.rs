@@ -21,6 +21,15 @@ impl<D: Dtype> Arena<D> {
 		}
 	}
 
+	// ROPE 固定分配f32, 如果按照D::SIZE分配, 在bf16模型上就出问题了
+	pub fn alloc_bytes(&self, name: String, shape: Vec<usize>, elem_size: usize) {
+		let size = (elem_size * shape.iter().product::<usize>() + 255) & !255;
+		self.entries
+			.borrow_mut()
+			.insert(name, (*self.offset.borrow(), shape));
+		*self.offset.borrow_mut() += size
+	}
+
 	pub fn alloc(&self, name: String, shape: Vec<usize>) {
 		let numel: usize = shape.iter().product();
 		let size = (numel * D::SIZE + 255) & !255;
