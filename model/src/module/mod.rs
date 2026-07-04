@@ -9,3 +9,4 @@ pub mod transformer;
 pub mod gqattention;
 pub mod rope;
 pub mod swiglu_mlp;
+pub mod rmsnorm;
